@@ -35,10 +35,32 @@ class PagarmeClient:
         self._auth_header = self._build_auth()
 
     def _build_auth(self) -> str:
-        """Build Basic Auth header: base64(secret_key:)."""
-        credentials = f"{self.secret_key}:"
+        """Build Basic Auth header: base64(secret_key:).
+
+        Aceita tanto a chave raw (sk_xxx) quanto já convertida em base64.
+        """
+        key = self.secret_key.strip()
+
+        # Se já parece ser base64 (contém apenas chars válidos de base64 e tem tamanho par)
+        # e NÃO começa com sk_, assume que já está convertido
+        if not key.startswith("sk_") and self._is_likely_base64(key):
+            return f"Basic {key}"
+
+        # Senão, converte: base64(secret_key:)
+        credentials = f"{key}:"
         encoded = base64.b64encode(credentials.encode()).decode()
         return f"Basic {encoded}"
+
+    @staticmethod
+    def _is_likely_base64(value: str) -> bool:
+        """Check if a string looks like it's already base64 encoded."""
+        import re
+        # Base64 chars: A-Z, a-z, 0-9, +, /, =
+        # Typical base64 length is multiple of 4 (with padding)
+        if not value:
+            return False
+        pattern = re.compile(r'^[A-Za-z0-9+/]+=*$')
+        return bool(pattern.match(value)) and len(value) >= 8
 
     def _headers(self) -> dict:
         return {
