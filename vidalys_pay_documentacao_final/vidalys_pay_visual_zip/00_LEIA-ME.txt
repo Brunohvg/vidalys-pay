@@ -1,0 +1,31 @@
+KIT VISUAL E DE CORRECAO DO APP - VIDALYS PAY
+
+ARQUIVO PRINCIPAL:
+07_PROMPT_PRINCIPAL_CORRECAO_COMPLETA_DO_APP.md
+
+Esse e o prompt que deve ser entregue para a IA que ira analisar e corrigir o codigo do aplicativo ja criado.
+Ele inclui:
+- preservacao do backend e das integracoes
+- tipografia completa
+- paleta e tokens
+- layout e responsividade
+- formularios
+- historico
+- badges e toasts
+- favicon e PWA
+- acessibilidade
+- processo de auditoria, correcao e validacao
+
+CONTEUDO DO PACOTE:
+1. 01_identidade_visual_vidalys_pay.png
+2. 02_icones_favicon_exportacao_vidalys_pay.png
+3. 03_design_system_vidalys_pay.png
+4. 04_guia_implementacao_handoff_vidalys_pay.png
+5. 05_prompt_correcao_visual_sistema.md
+6. 06_prompt_posicionamento_dos_ativos.md
+7. 07_PROMPT_PRINCIPAL_CORRECAO_COMPLETA_DO_APP.md
+8. 08_CHECKLIST_DE_VALIDACAO_VISUAL.md
+
+IMPORTANTE:
+- Os PNGs sao guias visuais, nao arquivos SVG editaveis.
+- O prompt principal manda a IA corrigir o codigo real do sistema sem reconstruir ou quebrar o backend.

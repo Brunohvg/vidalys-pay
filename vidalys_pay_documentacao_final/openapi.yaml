@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: Vidalys Pay API
+  version: 1.0.0
+  description: API interna para links de pagamento e integrações futuras.
+servers:
+  - url: https://pay.vidalys.com.br/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /payment-links:
+    post:
+      operationId: createPaymentLink
+      summary: Cria um link de pagamento
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 100}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreatePaymentLinkRequest'}
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentLinkResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    get:
+      operationId: listPaymentLinks
+      summary: Lista links autorizados
+      parameters:
+        - in: query
+          name: status
+          schema: {$ref: '#/components/schemas/PaymentLinkStatus'}
+        - in: query
+          name: cursor
+          schema: {type: string}
+        - in: query
+          name: limit
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        '200':
+          description: Lista
+  /payment-links/{id}:
+    get:
+      operationId: getPaymentLink
+      summary: Detalha um link
+      parameters:
+        - $ref: '#/components/parameters/PaymentLinkId'
+      responses:
+        '200': {description: Detalhe}
+        '404': {description: Não encontrado}
+  /payment-links/{id}/resend:
+    post:
+      operationId: resendPaymentLink
+      summary: Enfileira reenvio ao WhatsApp do vendedor
+      parameters:
+        - $ref: '#/components/parameters/PaymentLinkId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string}
+      responses:
+        '202': {description: Enfileirado}
+  /payment-links/{id}/cancel:
+    post:
+      operationId: cancelPaymentLink
+      summary: Solicita cancelamento de link ativo
+      parameters:
+        - $ref: '#/components/parameters/PaymentLinkId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: {type: string, maxLength: 255}
+      responses:
+        '202': {description: Cancelamento solicitado}
+        '409': {description: Estado não permite cancelamento}
+  /me:
+    get:
+      operationId: getSellerProfile
+      summary: Perfil da sessão do vendedor
+      security: []
+      responses:
+        '200': {description: Perfil}
+  /me/logout:
+    post:
+      operationId: logoutSeller
+      summary: Encerra sessão atual
+      security: []
+      responses:
+        '204': {description: Encerrada}
+  /webhooks/pagarme/{endpoint_secret}:
+    post:
+      operationId: receivePagarmeWebhook
+      summary: Recebe webhook do Pagar.me
+      security: []
+      parameters:
+        - in: path
+          name: endpoint_secret
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '200': {description: Recebido ou duplicado}
+        '400': {description: Payload inválido}
+        '401': {description: Autenticidade inválida}
+  /health:
+    get:
+      security: []
+      responses:
+        '200': {description: Vivo}
+  /ready:
+    get:
+      security: []
+      responses:
+        '200': {description: Pronto}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: VidalysApiKey
+  parameters:
+    PaymentLinkId:
+      in: path
+      name: id
+      required: true
+      schema: {type: string, format: uuid}
+  schemas:
+    PaymentLinkStatus:
+      type: string
+      enum: [CREATING, CREATION_UNKNOWN, CREATION_ERROR, ACTIVE, PAID, CANCELED, EXPIRED, REFUNDED]
+    CreatePaymentLinkRequest:
+      type: object
+      required: [reference, amount_cents, installments]
+      additionalProperties: false
+      properties:
+        reference: {type: string, minLength: 1, maxLength: 80}
+        amount_cents: {type: integer, minimum: 1}
+        installments: {type: integer, minimum: 1, maximum: 3}
+        customer_name: {type: [string, 'null'], maxLength: 120}
+        customer_phone: {type: [string, 'null'], maxLength: 20}
+        description: {type: [string, 'null'], maxLength: 255}
+        expires_in_minutes: {type: [integer, 'null'], minimum: 10, maximum: 43200}
+    PaymentLink:
+      type: object
+      required: [id, reference, amount_cents, installments, status, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        reference: {type: string}
+        amount_cents: {type: integer}
+        amount_formatted: {type: string}
+        installments: {type: integer}
+        status: {$ref: '#/components/schemas/PaymentLinkStatus'}
+        payment_url: {type: [string, 'null'], format: uri}
+        expires_at: {type: [string, 'null'], format: date-time}
+        created_at: {type: string, format: date-time}
+    PaymentLinkResponse:
+      type: object
+      required: [data]
+      properties:
+        data: {$ref: '#/components/schemas/PaymentLink'}
+  responses:
+    Conflict:
+      description: Conflito de idempotência ou estado
+    ValidationError:
+      description: Regra de negócio ou validação

@@ -1,0 +1,40 @@
+services:
+  web:
+    build:
+      context: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout 60
+    environment: &app_env
+      SECRET_KEY: ${SECRET_KEY:?}
+      DEBUG: ${DEBUG:-false}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?}
+      APP_BASE_URL: ${APP_BASE_URL:?}
+      APP_NAME: ${APP_NAME:-Vidalys Pay}
+      DATABASE_URL: ${DATABASE_URL:?}
+      PAGARME_BASE_URL: ${PAGARME_BASE_URL:?}
+      PAGARME_SECRET_KEY: ${PAGARME_SECRET_KEY:?}
+      PAGARME_WEBHOOK_BASIC_AUTH_USER: ${PAGARME_WEBHOOK_BASIC_AUTH_USER:?}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:?}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:?}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:?}
+      INVITATION_EXPIRATION_HOURS: ${INVITATION_EXPIRATION_HOURS:-24}
+      SELLER_SESSION_DAYS: ${SELLER_SESSION_DAYS:-30}
+      INVITATION_TOKEN_PEPPER: ${INVITATION_TOKEN_PEPPER:?}
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+    command: python manage.py run_outbox_worker
+    environment: *app_env
+    restart: unless-stopped

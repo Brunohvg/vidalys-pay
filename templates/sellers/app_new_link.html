@@ -1,0 +1,183 @@
+{% extends "sellers/app_base.html" %}
+
+{% block content %}
+<h2 style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--color-navy-900);">Novo link de pagamento</h2>
+
+<div class="card">
+    <form id="createForm" method="post" action="/api/v1/payment-links/">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label class="form-label" for="amount">Valor (R$)</label>
+            <div class="money-input-wrapper">
+                <span class="money-prefix">R$</span>
+                <input
+                    type="text"
+                    id="amount"
+                    name="amount_display"
+                    class="form-input money-input"
+                    placeholder="0,00"
+                    inputmode="decimal"
+                    required
+                    aria-describedby="amount-hint"
+                >
+                <input type="hidden" id="amount_cents" name="amount_cents">
+            </div>
+            <span class="form-hint" id="amount-hint">Valor mínimo: R$ 1,00</span>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Parcelamento</label>
+            <div class="installments" role="radiogroup" aria-label="Número de parcelas">
+                <button type="button" class="option selected" data-value="1" role="radio" aria-checked="true">1x sem juros</button>
+                <button type="button" class="option" data-value="2" role="radio" aria-checked="false">2x sem juros</button>
+                <button type="button" class="option" data-value="3" role="radio" aria-checked="false">3x sem juros</button>
+            </div>
+            <input type="hidden" id="installments" name="installments" value="1">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="reference">Referência / Pedido <span class="required">*</span></label>
+            <input
+                type="text"
+                id="reference"
+                name="reference"
+                class="form-input"
+                placeholder="Ex: PED-45892"
+                maxlength="80"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="customer_name">Cliente <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
+            <input
+                type="text"
+                id="customer_name"
+                name="customer_name"
+                class="form-input"
+                placeholder="Nome do cliente"
+                maxlength="120"
+            >
+            <span class="form-hint">Nome completo ou nome da empresa</span>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="customer_phone">Telefone <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
+            <input
+                type="tel"
+                id="customer_phone"
+                name="customer_phone"
+                class="form-input"
+                placeholder="(31) 99999-9999"
+                maxlength="20"
+                inputmode="tel"
+            >
+            <span class="form-hint">Utilizado somente quando necessário para identificação ou comunicação</span>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitBtn">
+            <span class="btn-text">Criar link de pagamento</span>
+            <span class="spinner"></span>
+        </button>
+    </form>
+</div>
+
+<div id="formError" class="alert alert--danger" style="display: none;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('createForm');
+    const amountInput = document.getElementById('amount');
+    const amountCents = document.getElementById('amount_cents');
+    const installmentsInput = document.getElementById('installments');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorDiv = document.getElementById('formError');
+
+    // Money formatting
+    amountInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/[^\d]/g, '');
+        if (value) {
+            value = (parseInt(value) / 100).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        e.target.value = value;
+        amountCents.value = value ? Math.round(parseFloat(value.replace('.', '').replace(',', '.')) * 100) : '';
+    });
+
+    // Installments selector
+    document.querySelectorAll('.installments .option').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.installments .option').forEach(b => {
+                b.classList.remove('selected');
+                b.setAttribute('aria-checked', 'false');
+            });
+            this.classList.add('selected');
+            this.setAttribute('aria-checked', 'true');
+            installmentsInput.value = this.dataset.value;
+        });
+    });
+
+    // Form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        errorDiv.style.display = 'none';
+
+        if (!amountCents.value || parseInt(amountCents.value) <= 0) {
+            showError('Informe um valor válido.');
+            return;
+        }
+
+        submitBtn.classList.add('loading');
+        submitBtn.disabled = true;
+
+        const payload = {
+            reference: form.reference.value,
+            amount_cents: parseInt(amountCents.value),
+            installments: parseInt(installmentsInput.value),
+            customer_name: form.customer_name.value || null,
+            customer_phone: form.customer_phone.value || null,
+        };
+
+        try {
+            const idempotencyKey = crypto.randomUUID();
+            const response = await fetch('/api/v1/payment-links/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Idempotency-Key': idempotencyKey,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.href = '/app/sucesso/?link_id=' + data.data.id;
+            } else {
+                showError(data.error?.message || 'Não foi possível criar o link. Tente novamente.');
+            }
+        } catch (err) {
+            if (!navigator.onLine) {
+                showError('Sem conexão. Criação de link não disponível offline.');
+            } else {
+                showError('Erro de conexão. Tente novamente.');
+            }
+        } finally {
+            submitBtn.classList.remove('loading');
+            submitBtn.disabled = false;
+        }
+    });
+
+    function showError(msg) {
+        errorDiv.textContent = msg;
+        errorDiv.style.display = 'flex';
+    }
+});
+</script>
+{% endblock %}

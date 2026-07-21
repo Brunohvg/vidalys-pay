@@ -1,0 +1,129 @@
+{% extends "sellers/app_base.html" %}
+
+{% block content %}
+<div class="filters" role="tablist" aria-label="Filtrar por status">
+    <button class="filter {% if not status_filter %}active{% endif %}" data-status="" role="tab" aria-selected="{% if not status_filter %}true{% else %}false{% endif %}">Todos</button>
+    <button class="filter {% if status_filter == 'ACTIVE' %}active{% endif %}" data-status="ACTIVE" role="tab" aria-selected="{% if status_filter == 'ACTIVE' %}true{% else %}false{% endif %}">Aguardando</button>
+    <button class="filter {% if status_filter == 'PAID' %}active{% endif %}" data-status="PAID" role="tab" aria-selected="{% if status_filter == 'PAID' %}true{% else %}false{% endif %}">Pagos</button>
+    <button class="filter {% if status_filter == 'CANCELED' %}active{% endif %}" data-status="CANCELED" role="tab" aria-selected="{% if status_filter == 'CANCELED' %}true{% else %}false{% endif %}">Cancelados</button>
+    <button class="filter {% if status_filter == 'EXPIRED' %}active{% endif %}" data-status="EXPIRED" role="tab" aria-selected="{% if status_filter == 'EXPIRED' %}true{% else %}false{% endif %}">Expirados</button>
+</div>
+
+{% if links %}
+    <div id="linksList">
+    {% for link in links %}
+        <div class="link-card" data-status="{{ link.status }}">
+            <div class="link-card__header">
+                <div>
+                    <div class="link-card__reference">{{ link.reference }}</div>
+                    {% if link.customer_name %}
+                        <div class="link-card__customer">{{ link.customer_name }}</div>
+                    {% endif %}
+                </div>
+                {% if link.status == 'ACTIVE' %}
+                    <span class="badge badge--pending">Aguardando</span>
+                {% elif link.status == 'PAID' %}
+                    <span class="badge badge--paid">Pago</span>
+                {% elif link.status == 'CANCELED' %}
+                    <span class="badge badge--canceled">Cancelado</span>
+                {% elif link.status == 'EXPIRED' %}
+                    <span class="badge badge--expired">Expirado</span>
+                {% elif link.status == 'REFUNDED' %}
+                    <span class="badge badge--refunded">Reembolsado</span>
+                {% elif link.status == 'CREATING' %}
+                    <span class="badge badge--created">Criado</span>
+                {% else %}
+                    <span class="badge badge--created">{{ link.get_status_display }}</span>
+                {% endif %}
+            </div>
+            <div class="link-card__amount">R$ {{ link.amount_cents|floatformat:2 }}</div>
+            <div class="link-card__meta">
+                <span>{{ link.installments }}x sem juros</span>
+                <span>{{ link.created_at|date:"d/m/Y H:mm" }}</span>
+            </div>
+            {% if link.payment_url %}
+            <div class="link-card__actions">
+                <button class="link-card__action" onclick="copyLink('{{ link.payment_url }}')" aria-label="Copiar link">
+                    📋 Copiar
+                </button>
+                <button class="link-card__action" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')" aria-label="Compartilhar link">
+                    📤 Compartilhar
+                </button>
+                <button class="link-card__action" onclick="resendLink('{{ link.id }}')" aria-label="Reenviar link">
+                    🔄 Reenviar
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state__icon">📄</div>
+        <p class="empty-state__text">
+            {% if status_filter %}
+                Nenhum link encontrado com este filtro.
+            {% else %}
+                Você ainda não criou nenhum link.<br>Crie seu primeiro link e comece a receber pagamentos.
+            {% endif %}
+        </p>
+        <a href="/app/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-6);">Criar link</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter tabs
+    document.querySelectorAll('.filter').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const status = this.dataset.status;
+            window.location.href = status ? '/app/historico/?status=' + status : '/app/historico/';
+        });
+    });
+});
+
+async function copyLink(url) {
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copiado!', 'success');
+    } catch {
+        showToast('Não foi possível copiar', 'error');
+    }
+}
+
+async function shareLink(url, reference) {
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Link de pagamento - ' + reference,
+                text: 'Link de pagamento para pedido ' + reference,
+                url: url,
+            });
+        } catch {}
+    } else {
+        copyLink(url);
+    }
+}
+
+async function resendLink(linkId) {
+    try {
+        const response = await fetch('/api/v1/payment-links/' + linkId + '/resend/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                'Idempotency-Key': crypto.randomUUID(),
+            },
+        });
+        if (response.ok) {
+            showToast('Link reenviado!', 'success');
+        } else {
+            showToast('Erro ao reenviar', 'error');
+        }
+    } catch {
+        showToast('Erro de conexão', 'error');
+    }
+}
+</script>
+{% endblock %}

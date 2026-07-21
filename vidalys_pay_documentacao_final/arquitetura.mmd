@@ -1,0 +1,11 @@
+flowchart LR
+    Seller[Celular do vendedor / PWA] -->|HTTPS| Proxy[Coolify Proxy/TLS]
+    Admin[Administrador] -->|HTTPS| Proxy
+    N8N[n8n externo] -->|API Key| Proxy
+    Pagarme[Pagar.me] -->|Webhook| Proxy
+    Proxy --> Web[Django Web + DRF]
+    Web --> DB[(PostgreSQL)]
+    Web --> Pagarme
+    Web --> DB
+    Worker[Worker Django] --> DB
+    Worker --> Evolution[Evolution API externa]

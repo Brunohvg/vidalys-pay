@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+<defs>
+<linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+  <stop offset="0%" stop-color="#19D5D8"/>
+  <stop offset="52%" stop-color="#15AFFF"/>
+  <stop offset="100%" stop-color="#2563FF"/>
+</linearGradient>
+<linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+  <stop offset="0%" stop-color="#0C2A6C"/>
+  <stop offset="100%" stop-color="#04102B"/>
+</linearGradient>
+<radialGradient id="glow" cx="50%" cy="45%" r="60%">
+  <stop offset="0%" stop-color="#1B78FF" stop-opacity="0.28"/>
+  <stop offset="100%" stop-color="#1B78FF" stop-opacity="0"/>
+</radialGradient>
+<filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+  <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#001038" flood-opacity="0.28"/>
+</filter>
+
+</defs>
+
+<rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGradient)"/><rect x="16" y="16" width="480" height="480" rx="112" fill="url(#glow)"/><g transform="translate(30 20) scale(0.94)" fill="none" stroke="url(#brandGradient)" stroke-width="31" stroke-linecap="round" stroke-linejoin="round">
+<path d="M40 256 H118 L178 142 L250 370 L310 256 H352"/>
+<path d="M322 196 H392 C431 196 458 222 458 256 C458 290 431 316 392 316 H350"/>
+<path d="M350 256 H407"/>
+</g>
+</svg>

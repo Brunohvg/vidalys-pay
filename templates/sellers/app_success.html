@@ -1,0 +1,100 @@
+{% extends "sellers/app_base.html" %}
+
+{% block content %}
+{% if link %}
+<div class="success-screen">
+    <div class="success-icon">✓</div>
+
+    <h2 style="font-size: var(--text-xl); font-weight: 700; color: var(--color-navy-900); margin-bottom: var(--space-2);">Link criado com sucesso!</h2>
+    <p style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-6);">Seu link de pagamento está pronto para ser compartilhado.</p>
+
+    <div class="success-amount">R$ {{ link.amount_cents|floatformat:2 }}</div>
+    <div class="success-installments">{{ link.installments }}x sem juros · {{ link.reference }}</div>
+
+    <div class="whatsapp-status" id="whatsappStatus">
+        <span class="dot dot--sending"></span>
+        <span>Enviando link pelo WhatsApp...</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-6); max-width: 320px; margin-inline: auto;">
+        <button class="btn-primary" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')">
+            📤 Compartilhar link
+        </button>
+        <button class="btn-secondary" onclick="copyLink('{{ link.payment_url }}')">
+            📋 Copiar link
+        </button>
+        <button class="btn-whatsapp" onclick="resendLink('{{ link.id }}')">
+            🔄 Reenviar via WhatsApp
+        </button>
+    </div>
+
+    <div style="margin-top: var(--space-6);">
+        <a href="/app/" style="color: var(--color-blue-600); font-size: var(--text-sm); font-weight: 600; text-decoration: none;">
+            Criar outro link
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state__icon">❓</div>
+    <p class="empty-state__text">Link não encontrado.</p>
+    <a href="/app/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-6);">Criar novo link</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if link %}
+// Simulate WhatsApp status updates
+setTimeout(() => {
+    const status = document.getElementById('whatsappStatus');
+    if (status) {
+        status.innerHTML = '<span class="dot dot--sent"></span><span>Link enviado pelo WhatsApp</span>';
+    }
+}, 3000);
+{% endif %}
+
+async function copyLink(url) {
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copiado!', 'success');
+    } catch {
+        showToast('Não foi possível copiar', 'error');
+    }
+}
+
+async function shareLink(url, reference) {
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Link de pagamento - ' + reference,
+                text: 'Link de pagamento para pedido ' + reference,
+                url: url,
+            });
+        } catch {}
+    } else {
+        copyLink(url);
+    }
+}
+
+async function resendLink(linkId) {
+    try {
+        const response = await fetch('/api/v1/payment-links/' + linkId + '/resend/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                'Idempotency-Key': crypto.randomUUID(),
+            },
+        });
+        if (response.ok) {
+            showToast('Link reenviado!', 'success');
+        } else {
+            showToast('Erro ao reenviar', 'error');
+        }
+    } catch {
+        showToast('Erro de conexão', 'error');
+    }
+}
+</script>
+{% endblock %}

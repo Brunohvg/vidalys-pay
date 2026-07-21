@@ -1,0 +1,74 @@
+{% extends "sellers/app_base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="profile-section">
+        <div class="profile-label">Nome</div>
+        <div class="profile-value">{{ seller.name }}</div>
+    </div>
+
+    <div class="profile-section">
+        <div class="profile-label">WhatsApp</div>
+        <div class="profile-value">{{ seller.whatsapp_phone }}</div>
+    </div>
+
+    <div class="profile-section">
+        <div class="profile-label">Limite por link</div>
+        <div class="profile-value">R$ {{ seller.max_payment_amount_cents|floatformat:2 }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-3); color: var(--color-gray-500);">Sessões ativas</h3>
+    {% for session in sessions %}
+        <div class="profile-section" style="padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-gray-100);">
+            <div class="profile-value" style="font-size: var(--text-sm);">
+                {{ session.device_label|default:"Dispositivo desconhecido" }}
+            </div>
+            <div style="font-size: var(--text-xs); color: var(--color-gray-500); margin-top: var(--space-1);">
+                Último acesso: {{ session.last_seen_at|date:"d/m/Y H:mm" }}
+            </div>
+        </div>
+    {% empty %}
+        <p style="font-size: var(--text-sm); color: var(--color-gray-500);">Nenhuma sessão ativa.</p>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <a href="/static/manifest.webmanifest" class="profile-action" download>
+        <span class="profile-action__text">Instalar aplicativo</span>
+        <span class="profile-action__arrow">›</span>
+    </a>
+
+    <button class="profile-action profile-action--danger" onclick="requestLogout()" type="button">
+        <span class="profile-action__text">Sair deste aparelho</span>
+        <span class="profile-action__arrow">›</span>
+    </button>
+</div>
+
+<div style="text-align: center; padding: var(--space-5) 0; font-size: var(--text-xs); color: var(--color-gray-400);">
+    {{ app_name }} v0.1.0
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function requestLogout() {
+    if (!confirm('Deseja sair deste aparelho?')) return;
+
+    try {
+        const response = await fetch('/api/v1/me/logout/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            },
+        });
+        if (response.ok || response.status === 204) {
+            window.location.href = '/';
+        }
+    } catch {
+        showToast('Erro ao sair', 'error');
+    }
+}
+</script>
+{% endblock %}
