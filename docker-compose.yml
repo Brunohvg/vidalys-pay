@@ -31,6 +31,8 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - coolify
 
   worker:
     build:
@@ -38,3 +40,9 @@ services:
     command: python manage.py run_outbox_worker
     environment: *app_env
     restart: unless-stopped
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true
