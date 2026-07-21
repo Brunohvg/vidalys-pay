@@ -1,0 +1,62 @@
+# Vidalys Pay - Docker Compose para Produção (Coolify)
+# URL: https://pay.vidalys.com.br
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout 60
+    environment: &app_env
+      # === APLICAÇÃO ===
+      SECRET_KEY: ${SECRET_KEY:?}
+      DEBUG: "false"
+      ALLOWED_HOSTS: pay.vidalys.com.br
+      CSRF_TRUSTED_ORIGINS: https://pay.vidalys.com.br
+      APP_BASE_URL: https://pay.vidalys.com.br
+      APP_NAME: Vidalys Pay
+      
+      # === BANCO DE DADOS ===
+      DATABASE_URL: ${DATABASE_URL:?}
+      
+      # === PAGAR.ME ===
+      PAGARME_BASE_URL: https://api.pagar.me/core/v5
+      PAGARME_SECRET_KEY: ${PAGARME_SECRET_KEY:?}
+      PAGARME_WEBHOOK_BASIC_AUTH_USER: ${PAGARME_WEBHOOK_BASIC_AUTH_USER:?}
+      
+      # === EVOLUTION API ===
+      EVOLUTION_API_URL: https://api.lojabibelo.com.br
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:?}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:?}
+      
+      # === ACESSO ===
+      INVITATION_EXPIRATION_HOURS: "24"
+      SELLER_SESSION_DAYS: "30"
+      INVITATION_TOKEN_PEPPER: ${INVITATION_TOKEN_PEPPER:?}
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?}
+      
+      # === OPERAÇÃO ===
+      LOG_LEVEL: INFO
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      WORKER_POLL_SECONDS: "3"
+      MAX_NOTIFICATION_ATTEMPTS: "5"
+    
+    expose:
+      - "8000"
+    
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py run_outbox_worker
+    environment: *app_env
+    restart: unless-stopped
