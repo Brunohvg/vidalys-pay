@@ -1,0 +1,16 @@
+services:
+  debug:
+    image: postgres:17-alpine
+    command: >
+      sh -c "echo '=== Diagnostico de Rede ===' && 
+             echo 'Testando DNS...' && 
+             nslookup s1354dywdnufyy9wzbjcts9t || echo 'DNS falhou' &&
+             echo 'Testando conexao PostgreSQL...' && 
+             pg_isready -h s1354dywdnufyy9wzbjcts9t -p 5432 -U vidalys || echo 'Conexao falhou' &&
+             echo '=== Fim do diagnostico ==='"
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true
