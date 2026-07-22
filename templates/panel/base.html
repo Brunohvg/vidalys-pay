@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <meta name="theme-color" content="#071B4A">
     <title>{% block title %}Painel{% endblock %} — Vidalys Pay</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
@@ -11,18 +11,43 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
     <link rel="stylesheet" href="{% static 'panel/css/panel.css' %}">
-    {% block extra_head %}{% endblock %}
 </head>
-<body class="panel-body">
-    <button class="panel-overlay" id="sidebarOverlay" aria-hidden="true" tabindex="-1"></button>
+<body class="admin-body">
+
+    <button class="admin-overlay" id="overlay" aria-hidden="true" tabindex="-1"></button>
+
     {% include "panel/components/sidebar.html" %}
-    <div class="panel-main">
-        {% include "panel/components/header.html" %}
-        {% include "panel/components/messages.html" %}
-        <main class="panel-content">
+
+    <div class="admin-main">
+        {% include "panel/components/topbar.html" %}
+
+        {% if messages %}
+        <div class="messages" aria-live="polite">
+            {% for m in messages %}
+            <div class="msg msg--{{ m.tags|default:'info' }}">
+                {% if m.tags == 'success' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                {% elif m.tags == 'error' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                {% elif m.tags == 'warning' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+                {% else %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                {% endif %}
+                <span class="msg__text">{{ m }}</span>
+                <button class="msg__close" onclick="this.parentElement.remove()" aria-label="Fechar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <main class="admin-content">
             {% block content %}{% endblock %}
         </main>
     </div>
+
     {% include "panel/components/modal.html" %}
     <script src="{% static 'panel/js/panel.js' %}"></script>
     {% block scripts %}{% endblock %}

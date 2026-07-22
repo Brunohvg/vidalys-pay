@@ -1,91 +1,68 @@
 {% extends "panel/base.html" %}
 
 {% block title %}Criar vendedor{% endblock %}
-
 {% block page_title %}Criar vendedor{% endblock %}
-{% block page_description %}<p class="panel-header__desc">Cadastre um novo vendedor e envie o convite de acesso.</p>{% endblock %}
 
 {% block content %}
-<div class="panel-form-container">
+<div class="form-narrow">
+
 {% if error %}
-<div class="panel-message panel-message--error" style="margin-bottom:var(--space-4);">
-    <span class="panel-message__text">{{ error }}</span>
-</div>
+<div class="msg msg--error" style="margin-bottom:16px"><span class="msg__text">{{ error }}</span></div>
 {% endif %}
 
-<div class="panel-card">
-    <form method="post" action="{% url 'admin_panel:create_seller' %}" id="createSellerForm">
+<div class="card">
+    <form method="post" action="{% url 'admin_panel:create_seller' %}" id="createForm">
         {% csrf_token %}
 
-        <div class="panel-fields">
-            <div class="panel-field">
-                <label class="panel-field__label" for="name">Nome completo</label>
-                <input type="text" id="name" name="name" class="panel-field__input"
-                       placeholder="Nome do vendedor" required autocomplete="off"
-                       value="{{ form_data.name|default:'' }}">
-            </div>
-
-            <div class="panel-field">
-                <label class="panel-field__label" for="whatsapp_display">WhatsApp</label>
-                <input type="tel" id="whatsapp_display" class="panel-field__input"
-                       placeholder="(31) 99999-9999" required autocomplete="off" maxlength="20"
-                       value="{{ form_data.phone|default:'' }}">
-                <input type="hidden" id="whatsapp" name="whatsapp">
-                <p class="panel-field__hint">O link de acesso será enviado automaticamente para este número.</p>
-            </div>
-
-            <div class="panel-field">
-                <label class="panel-field__label" for="max_amount">Limite por link (R$)</label>
-                <input type="number" id="max_amount" name="max_amount" class="panel-field__input"
-                       placeholder="500,00" step="0.01" min="1" value="{{ form_data.max_amount|default:'500.00' }}">
-                <p class="panel-field__hint">Valor máximo que o vendedor pode cobrar em cada link. Padrão: R$ 500,00.</p>
-            </div>
+        <div class="field">
+            <label class="field__label" for="name">Nome completo</label>
+            <input type="text" id="name" name="name" class="field__input"
+                   placeholder="Nome do vendedor" required autocomplete="off"
+                   value="{{ form_data.name|default:'' }}">
         </div>
 
-        <button type="submit" class="panel-btn panel-btn--primary" id="submitBtn" style="margin-top:var(--space-5);">
-            <span class="panel-btn__text">Criar vendedor</span>
-            <span class="panel-btn__spinner"></span>
+        <div class="field">
+            <label class="field__label" for="phone_display">WhatsApp</label>
+            <input type="tel" id="phone_display" class="field__input"
+                   placeholder="(31) 99999-9999" required autocomplete="off" maxlength="20"
+                   value="{{ form_data.phone|default:'' }}">
+            <input type="hidden" id="phone" name="whatsapp">
+            <p class="field__hint">O link de acesso será enviado automaticamente.</p>
+        </div>
+
+        <div class="field">
+            <label class="field__label" for="max_amount">Limite por link (R$)</label>
+            <input type="number" id="max_amount" name="max_amount" class="field__input"
+                   placeholder="500,00" step="0.01" min="1"
+                   value="{{ form_data.max_amount|default:'500.00' }}">
+            <p class="field__hint">Valor máximo por link. Padrão: R$ 500,00.</p>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--lg" id="submitBtn" style="width:100%;margin-top:8px">
+            <span class="btn__text">Criar vendedor</span>
+            <span class="btn__spinner"></span>
         </button>
     </form>
 </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-(function() {
-    var display = document.getElementById('whatsapp_display');
-    var hidden = document.getElementById('whatsapp');
-    if (!display || !hidden) return;
-
-    display.addEventListener('input', function() {
-        var raw = this.value.replace(/\D/g, '');
-        if (raw.length > 11) raw = raw.slice(0, 11);
-        var formatted = '';
-        if (raw.length > 0) {
-            formatted = '(' + raw.slice(0, 2);
-            if (raw.length > 2) {
-                formatted += ') ' + (raw.length > 7 ? raw.slice(2, 7) + '-' + raw.slice(7) : raw.slice(2));
-            }
-        }
-        this.value = formatted;
-        hidden.value = raw.length === 11 ? '+55' + raw : '';
+(function(){
+    var d=document.getElementById('phone_display');
+    var h=document.getElementById('phone');
+    if(!d||!h)return;
+    d.addEventListener('input',function(){
+        var r=this.value.replace(/\D/g,'');
+        if(r.length>11)r=r.slice(0,11);
+        var f='';
+        if(r.length>0){f='('+r.slice(0,2);if(r.length>2){f+=') '+(r.length>7?r.slice(2,7)+'-'+r.slice(7):r.slice(2));}}
+        this.value=f;h.value=r.length===11?'+55'+r:'';
     });
-
-    display.addEventListener('blur', function() {
-        var raw = this.value.replace(/\D/g, '');
-        if (raw.length > 0 && raw.length < 11) {
-            this.style.borderColor = 'var(--color-danger)';
-        } else {
-            this.style.borderColor = '';
-        }
-    });
-
-    var form = document.getElementById('createSellerForm');
-    var btn = document.getElementById('submitBtn');
-    form.addEventListener('submit', function() {
-        btn.classList.add('panel-btn--loading');
-        btn.disabled = true;
+    document.getElementById('createForm').addEventListener('submit',function(){
+        var b=document.getElementById('submitBtn');b.classList.add('btn--loading');b.disabled=true;
     });
 })();
 </script>

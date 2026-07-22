@@ -1,48 +1,60 @@
 {% extends "panel/base.html" %}
 
 {% block title %}Configurações{% endblock %}
-
 {% block page_title %}Configurações{% endblock %}
-{% block page_description %}<p class="panel-header__desc">Informações técnicas para integração.</p>{% endblock %}
 
 {% block content %}
-<div class="panel-card">
-    <h2 class="panel-card__title">Webhook Pagar.me</h2>
-    <p class="panel-card__desc">Cadastre esta URL no dashboard do Pagar.me para receber notificações de pagamento em tempo real.</p>
 
-    <div class="panel-webhook">
-        <code class="panel-webhook__url">{{ webhook_url }}</code>
-        <button type="button" class="panel-webhook__copy" onclick="copyWebhook(this)" data-url="{{ webhook_url }}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+<div class="card">
+    <h2 class="card__title" style="margin-bottom:8px">Webhook Pagar.me</h2>
+    <p style="font-size:.8125rem;color:var(--color-gray-500);margin-bottom:16px;line-height:1.5">
+        Cadastre esta URL no Pagar.me para receber notificações de pagamento em tempo real.
+    </p>
+
+    <div class="webhook-url">
+        <code>{{ webhook_url }}</code>
+        <button onclick="copyWebhook(this)" data-url="{{ webhook_url }}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copiar
         </button>
     </div>
 
-    <h3 class="panel-card__subtitle">Autenticação</h3>
-    <p class="panel-card__hint">Use <strong>Basic Auth</strong> com as credenciais configuradas nas variáveis de ambiente:</p>
-    <ul class="panel-config-list">
-        <li><code>PAGARME_WEBHOOK_BASIC_AUTH_USER</code> — usuário HTTP Basic Auth</li>
-        <li><code>PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD</code> — senha HTTP Basic Auth</li>
+    <h3 style="font-size:.875rem;font-weight:600;color:var(--navy);margin:20px 0 8px">Autenticação</h3>
+    <p style="font-size:.75rem;color:var(--color-gray-500);margin-bottom:8px">Use <strong>Basic Auth</strong> com as credenciais configuradas no ambiente:</p>
+    <ul class="config-list">
+        <li><code>PAGARME_WEBHOOK_BASIC_AUTH_USER</code> — usuário</li>
+        <li><code>PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD</code> — senha</li>
     </ul>
-    <p class="panel-card__hint">No Pagar.me, acesse <strong>Configurações → Webhooks</strong> e cadastre a URL acima com o método <strong>POST</strong> e formato <strong>JSON</strong>.</p>
+    <p style="font-size:.75rem;color:var(--color-gray-500);margin-top:8px">
+        No Pagar.me: <strong>Configurações → Webhooks</strong> → Nova URL → Método <strong>POST</strong> → Formato <strong>JSON</strong>.
+    </p>
 </div>
 
-<div class="panel-card">
-    <h2 class="panel-card__title">Correios</h2>
-    <p class="panel-card__desc">A integração com os Correios utiliza as credenciais configuradas no ambiente para cálculo de frete PAC e SEDEX.</p>
-    <p class="panel-card__hint">Variáveis: <code>CORREIOS_USUARIO</code>, <code>CORREIOS_CODIGO_ACESSO</code>, <code>CORREIOS_CARTAO_POSTAGEM</code>, <code>CORREIOS_CONTRATO</code>, <code>CORREIOS_CNPJ</code>, <code>CORREIOS_CEP_ORIGEM</code>, <code>CORREIOS_DIAS_ADICIONAIS</code>.</p>
+<div class="card">
+    <h2 class="card__title" style="margin-bottom:8px">Correios</h2>
+    <p style="font-size:.75rem;color:var(--color-gray-500);line-height:1.5">
+        Integração configurada via variáveis de ambiente:
+        <code style="display:block;margin-top:4px">CORREIOS_USUARIO</code>
+        <code>CORREIOS_CODIGO_ACESSO</code>
+        <code>CORREIOS_CARTAO_POSTAGEM</code>
+        <code>CORREIOS_CONTRATO</code>
+        <code>CORREIOS_CNPJ</code>
+        <code>CORREIOS_CEP_ORIGEM</code>
+        <code>CORREIOS_DIAS_ADICIONAIS</code>
+    </p>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-function copyWebhook(btn) {
-    var url = btn.getAttribute('data-url');
-    navigator.clipboard.writeText(url).then(function() {
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
-        btn.style.color = 'var(--vidalys-green)';
-        setTimeout(function() { btn.innerHTML = orig; btn.style.color = ''; }, 2000);
+function copyWebhook(btn){
+    var u=btn.getAttribute('data-url');
+    navigator.clipboard.writeText(u).then(function(){
+        var o=btn.innerHTML;
+        btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
+        btn.style.color='var(--green)';
+        setTimeout(function(){btn.innerHTML=o;btn.style.color=''},2000);
     });
 }
 </script>

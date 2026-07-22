@@ -1,0 +1,12 @@
+<header class="admin-topbar">
+    <button class="admin-topbar__menu" id="menuBtn" aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="admin-topbar__title">
+        <h1>{% block page_title %}Painel{% endblock %}</h1>
+        {% block page_description %}{% endblock %}
+    </div>
+    <div class="admin-topbar__actions">
+        {% block header_action %}{% endblock %}
+    </div>
+</header>

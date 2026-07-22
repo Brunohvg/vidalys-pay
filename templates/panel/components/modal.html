@@ -1,13 +1,13 @@
-<div class="panel-modal" id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="panel-modal__backdrop" id="modalBackdrop"></div>
-    <div class="panel-modal__content">
-        <h3 class="panel-modal__title" id="modalTitle"></h3>
-        <p class="panel-modal__text" id="modalText"></p>
-        <div class="panel-modal__actions">
-            <button type="button" class="panel-btn panel-btn--secondary" id="modalCancel">Cancelar</button>
-            <form method="post" id="modalForm" style="display:inline;">
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
+    <div class="modal__box">
+        <h3 class="modal__title" id="modalTitle"></h3>
+        <p class="modal__text" id="modalText"></p>
+        <div class="modal__actions">
+            <button type="button" class="btn btn--outline" id="modalCancel">Cancelar</button>
+            <form method="post" id="modalForm" style="display:inline">
                 {% csrf_token %}
-                <button type="submit" class="panel-btn panel-btn--danger" id="modalConfirm"></button>
+                <button type="submit" class="btn btn--danger" id="modalConfirmBtn"></button>
             </form>
         </div>
     </div>

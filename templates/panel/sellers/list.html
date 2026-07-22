@@ -2,94 +2,87 @@
 {% load formatting %}
 
 {% block title %}Vendedores{% endblock %}
-
 {% block page_title %}Vendedores{% endblock %}
-{% block page_description %}<p class="panel-header__desc">Gerencie os vendedores que podem criar links de pagamento.</p>{% endblock %}
 {% block header_action %}
-<a href="{% url 'admin_panel:create_seller_page' %}" class="panel-btn panel-btn--primary panel-btn--sm">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+<a href="{% url 'admin_panel:create_seller_page' %}" class="btn btn--primary btn--sm">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Adicionar
 </a>
 {% endblock %}
 
 {% block content %}
-<div class="panel-search">
-    <form method="get" class="panel-search__form" id="searchForm">
-        <svg class="panel-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" name="q" class="panel-search__input" placeholder="Buscar por nome ou telefone..."
-               value="{{ query|default:'' }}" autocomplete="off">
-        {% if query %}
-        <a href="{% url 'admin_panel:seller_list' %}" class="panel-search__clear" aria-label="Limpar busca">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </a>
-        {% endif %}
-    </form>
-    <div class="panel-filters">
-        <a href="{% url 'admin_panel:seller_list' %}" class="panel-filter{% if not status_filter %} active{% endif %}">Todos</a>
-        <a href="?status=active{% if query %}&q={{ query }}{% endif %}" class="panel-filter{% if status_filter == 'active' %} active{% endif %}">Ativos</a>
-        <a href="?status=inactive{% if query %}&q={{ query }}{% endif %}" class="panel-filter{% if status_filter == 'inactive' %} active{% endif %}">Inativos</a>
-    </div>
-    {% if query or status_filter %}
-    <p class="panel-search__count">{{ total_count }} vendedor{{ total_count|pluralize:"es" }} encontrado{{ total_count|pluralize:"s" }}</p>
+
+<div class="search-bar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="sellerSearch" placeholder="Buscar por nome ou telefone…" value="{{ query|default:'' }}" autocomplete="off">
+    {% if query %}
+    <a href="{% url 'admin_panel:seller_list' %}" class="btn btn--ghost btn--sm" style="margin-left:auto">Limpar</a>
     {% endif %}
 </div>
 
+<div class="filters">
+    <a href="{% url 'admin_panel:seller_list' %}"{% if not status_filter %} class="active"{% endif %}>Todos</a>
+    <a href="?status=active{% if query %}&q={{ query }}{% endif %}"{% if status_filter == 'active' %} class="active"{% endif %}>Ativos</a>
+    <a href="?status=inactive{% if query %}&q={{ query }}{% endif %}"{% if status_filter == 'inactive' %} class="active"{% endif %}>Inativos</a>
+    <a href="?status=pending{% if query %}&q={{ query }}{% endif %}"{% if status_filter == 'pending' %} class="active"{% endif %}>Convite pendente</a>
+</div>
+
+{% if query or status_filter %}
+<p class="search-count">{{ total_count }} vendedor{{ total_count|pluralize:"es" }}</p>
+{% endif %}
+
 {% if sellers %}
-<div class="panel-table-wrapper">
-    <table class="panel-table">
+<div class="table-wrap">
+    <table>
         <thead>
             <tr>
                 <th>Vendedor</th>
                 <th>WhatsApp</th>
-                <th class="panel-table__hide-mobile">Limite</th>
-                <th class="panel-table__hide-mobile">Status</th>
-                <th class="panel-table__hide-mobile">Convite</th>
-                <th class="panel-table__hide-mobile">Criado em</th>
+                <th class="hide-mobile">Limite</th>
+                <th class="hide-mobile">Status</th>
+                <th class="hide-mobile">Convite</th>
                 <th>Ações</th>
             </tr>
         </thead>
         <tbody>
             {% for item in sellers %}
             <tr>
-                <td><span class="panel-table__name">{{ item.seller.name }}</span></td>
-                <td><span class="panel-table__phone">{{ item.seller.whatsapp_phone }}</span></td>
-                <td class="panel-table__hide-mobile">{{ item.seller.max_payment_amount_cents|format_brl }}</td>
-                <td class="panel-table__hide-mobile">
+                <td><strong style="color:var(--navy);font-size:.8125rem">{{ item.seller.name }}</strong></td>
+                <td>{{ item.seller.whatsapp_phone }}</td>
+                <td class="hide-mobile">{{ item.seller.max_payment_amount_cents|format_brl }}</td>
+                <td class="hide-mobile">
                     {% if item.seller.is_active %}
-                    <span class="panel-badge panel-badge--active">Ativo</span>
+                    <span class="badge badge--green">Ativo</span>
                     {% else %}
-                    <span class="panel-badge panel-badge--inactive">Inativo</span>
+                    <span class="badge badge--red">Inativo</span>
                     {% endif %}
                 </td>
-                <td class="panel-table__hide-mobile">
+                <td class="hide-mobile">
                     {% if item.active_invitation %}
-                    <span class="panel-badge panel-badge--sent">Enviado</span>
-                    {% else %}
-                    <span style="font-size:0.75rem;color:var(--color-gray-400);">—</span>
-                    {% endif %}
+                    <span class="badge badge--blue">Enviado</span>
+                    {% else %}<span style="font-size:.6875rem;color:var(--color-gray-400)">—</span>{% endif %}
                 </td>
-                <td class="panel-table__hide-mobile">{{ item.seller.created_at|date:"d/m/Y" }}</td>
                 <td>
-                    <div class="panel-table__actions">
-                        <a href="{% url 'admin_panel:create_link' seller_id=item.seller.id %}" class="panel-btn panel-btn--primary panel-btn--xs">Criar link</a>
-                        <button type="button" class="panel-btn panel-btn--ghost panel-btn--xs panel-table__more" onclick="toggleActions(this)" aria-label="Mais ações">
+                    <div class="table-actions">
+                        <a href="{% url 'admin_panel:create_link' seller_id=item.seller.id %}" class="btn btn--primary btn--sm">Criar link</a>
+                        <button class="btn btn--ghost btn--sm table-more" onclick="toggleDropdown(this)" aria-label="Mais ações">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                         </button>
-                        <div class="panel-table__dropdown">
+                        <div class="table-dropdown">
                             <form method="post" action="{% url 'admin_panel:regenerate_invitation' seller_id=item.seller.id %}">
-                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">Reenviar convite</button>
+                                {% csrf_token %}<button type="submit">Reenviar convite</button>
                             </form>
                             {% if item.active_invitation %}
                             <form method="post" action="{% url 'admin_panel:revoke_invitation' seller_id=item.seller.id %}">
-                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">Revogar convite</button>
+                                {% csrf_token %}<button type="submit">Revogar convite</button>
                             </form>
                             {% endif %}
                             <form method="post" action="{% url 'admin_panel:toggle_seller' seller_id=item.seller.id %}">
-                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">{% if item.seller.is_active %}Desativar{% else %}Ativar{% endif %}</button>
+                                {% csrf_token %}<button type="submit">{% if item.seller.is_active %}Desativar{% else %}Ativar{% endif %}</button>
                             </form>
                             <hr>
-                            <button type="button" class="panel-table__dropdown-item panel-table__dropdown-item--danger"
-                                    onclick="confirmAction('Excluir vendedor?', '{{ item.seller.name|escapejs }} perderá o acesso.', '{% url 'admin_panel:delete_seller' seller_id=item.seller.id %}', 'Excluir vendedor')">
+                            <button type="button" class="danger"
+                                    onclick="confirmAction('Excluir vendedor?','{{ item.seller.name|escapejs }} perderá o acesso.','{% url 'admin_panel:delete_seller' seller_id=item.seller.id %}','Excluir vendedor')">
                                 Excluir
                             </button>
                         </div>
@@ -100,36 +93,42 @@
         </tbody>
     </table>
 </div>
+{% else %}
+<div class="empty">
+    <div class="empty__icon">📋</div>
+    <h3 class="empty__title">Nenhum vendedor encontrado</h3>
+    <p class="empty__text">Tente outro nome ou remova os filtros.</p>
+</div>
+{% endif %}
 
 {% if total_count > 25 %}
-<div class="panel-pagination">
+<div class="pagination">
     {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="panel-pagination__link">Anterior</a>
+    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Anterior</a>
     {% endif %}
-    <span class="panel-pagination__info">Página {{ page_obj.number }}</span>
+    <span>Página {{ page_obj.number }}</span>
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="panel-pagination__link">Próxima</a>
+    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Próxima</a>
     {% endif %}
 </div>
 {% endif %}
 
-{% else %}
-{% include "panel/components/empty_state.html" with title="Nenhum vendedor encontrado" text="Tente outro nome ou remova os filtros." %}
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-function toggleActions(btn) {
-    var dropdown = btn.parentElement.querySelector('.panel-table__dropdown');
-    var isOpen = dropdown.classList.contains('open');
-    document.querySelectorAll('.panel-table__dropdown.open').forEach(function(d) { d.classList.remove('open'); });
-    if (!isOpen) dropdown.classList.add('open');
+function toggleDropdown(btn){
+    var dd=btn.parentElement.querySelector('.table-dropdown');
+    var is=dd.classList.contains('open');
+    document.querySelectorAll('.table-dropdown.open').forEach(function(d){d.classList.remove('open')});
+    if(!is)dd.classList.add('open');
 }
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.panel-table__more')) {
-        document.querySelectorAll('.panel-table__dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+document.addEventListener('click',function(e){
+    if(!e.target.closest('.table-more')){
+        document.querySelectorAll('.table-dropdown.open').forEach(function(d){d.classList.remove('open')});
     }
 });
+var si=document.getElementById('sellerSearch');
+if(si)si.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();var q=si.value.trim();window.location='?q='+encodeURIComponent(q);}});
 </script>
 {% endblock %}
