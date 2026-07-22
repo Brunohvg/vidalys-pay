@@ -118,6 +118,25 @@ EVENT_MAP = {
         "link_status": "EXPIRED",
         "description": "Checkout fechado",
     },
+
+    # Payment link events
+    "payment-link.cancelled": {
+        "action": "mark_canceled",
+        "link_status": "CANCELED",
+        "description": "Link de pagamento cancelado",
+    },
+    "payment-link.expired": {
+        "action": "mark_expired",
+        "link_status": "EXPIRED",
+        "description": "Link de pagamento expirado",
+    },
+
+    # Chargeback events
+    "chargeback.received": {
+        "action": "create_attempt",
+        "attempt_status": "CHARGEDBACK",
+        "description": "Chargeback recebido",
+    },
 }
 
 # States that are considered final

@@ -229,6 +229,11 @@ def _find_payment_link(event: WebhookEvent, normalized) -> PaymentLink | None:
         if link:
             return link
 
+    if normalized.payment_link_id:
+        link = PaymentLink.objects.filter(provider_link_id=normalized.payment_link_id).first()
+        if link:
+            return link
+
     if normalized.checkout_id:
         link = PaymentLink.objects.filter(provider_link_id=normalized.checkout_id).first()
         if link:
