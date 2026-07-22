@@ -175,13 +175,81 @@ vidalys-pay/
 
 ## Deploy no Coolify
 
-1. Conecte o repositório ao Coolify
-2. Selecione Docker Compose
-3. Configure o domínio no serviço `web` porta 8000
-4. Preencha as variáveis de ambiente
-5. Deploy
+### Pré-requisitos
 
-Veja `RUNBOOK.md` para detalhes completos.
+- PostgreSQL criado ou selecionado no Coolify
+- Aplicação e banco na mesma rede interna (`coolify`)
+
+### Passo a passo
+
+1. **Configure o PostgreSQL** no Coolify e copie a URL interna de conexão (formato `postgresql://usuario:senha@host-interno:5432/nome-do-banco`)
+2. **Conecte o repositório** ao Coolify e selecione **Docker Compose**
+3. **Configure o domínio** no serviço `web`, porta `8000`
+4. **Preencha as variáveis de ambiente** (veja tabela abaixo)
+5. **Deploy**
+
+Após o primeiro deploy, crie o superusuário:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+### Variáveis obrigatórias
+
+| Variável | Descrição |
+|----------|-----------|
+| `SECRET_KEY` | Chave secreta Django (mín. 50 caracteres) |
+| `DATABASE_URL` | URL interna do PostgreSQL (`postgresql://...`) |
+| `ALLOWED_HOSTS` | Domínio da aplicação |
+| `CSRF_TRUSTED_ORIGINS` | Origem HTTPS da aplicação |
+| `APP_BASE_URL` | URL base da aplicação |
+| `PAGARME_SECRET_KEY` | Chave de produção do Pagar.me |
+| `PAGARME_WEBHOOK_BASIC_AUTH_USER` | Segredo Basic Auth para webhooks |
+| `EVOLUTION_API_URL` | URL da Evolution API |
+| `EVOLUTION_API_KEY` | Chave da Evolution API |
+| `EVOLUTION_INSTANCE` | Nome da instância Evolution |
+| `INVITATION_TOKEN_PEPPER` | Pepper para hash de convites |
+| `API_KEY_PEPPER` | Pepper para hash de API keys |
+
+### Variáveis opcionais
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `LOG_LEVEL` | `INFO` | Nível de log |
+| `GUNICORN_WORKERS` | `3` | Workers do Gunicorn |
+| `GUNICORN_TIMEOUT` | `60` | Timeout do Gunicorn (segundos) |
+| `WORKER_POLL_SECONDS` | `3` | Intervalo de polling do worker |
+| `MAX_NOTIFICATION_ATTEMPTS` | `5` | Tentativas máximas por notificação |
+| `DB_WAIT_MAX_ATTEMPTS` | `60` | Tentativas de espera pelo banco |
+| `DB_WAIT_INTERVAL_SECONDS` | `2` | Intervalo entre tentativas |
+| `DB_CONNECT_TIMEOUT_SECONDS` | `5` | Timeout de conexão com o banco |
+
+### Verificando o deploy
+
+```bash
+# Logs do serviço web
+docker compose logs -f web
+
+# Logs do worker
+docker compose logs -f worker
+
+# Healthcheck
+curl -s https://pay.vidalys.com.br/health/
+# {"status":"ok"}
+
+# Readiness (banco + migrations)
+curl -s https://pay.vidalys.com.br/health/ready/
+# {"status":"ready","database":"ok","migrations":"ok"}
+```
+
+### Importante
+
+- **Nunca** use `localhost` como host do banco de dados
+- **Nunca** defina `DB_HOST`, `DB_PORT`, `POSTGRES_USER` — use apenas `DATABASE_URL`
+- O banco PostgreSQL é externo, gerenciado pelo Coolify
+- A rede `coolify` deve ser externa (`external: true`) no compose
+
+Veja `RUNBOOK.md` para procedimentos operacionais.
 
 ## Comandos Úteis
 

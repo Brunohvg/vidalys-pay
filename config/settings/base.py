@@ -79,13 +79,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# Handle both postgres:// and postgresql:// formats
-_database_url = env("DATABASE_URL", default="postgresql://vidalys_pay:vidalys_pay@localhost:5432/vidalys_pay")
-if _database_url.startswith("postgres://"):
-    _database_url = _database_url.replace("postgres://", "postgresql://", 1)
-
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=_database_url),
+    "default": env.db("DATABASE_URL", default="postgresql://vidalys_pay:vidalys_pay@localhost:5432/vidalys_pay"),
 }
 
 AUTH_PASSWORD_VALIDATORS = [

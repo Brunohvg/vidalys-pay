@@ -5,7 +5,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 appuser && \
@@ -18,12 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x /app/docker/entrypoint.sh && \
+RUN chmod +x /app/docker/entrypoint-web.sh && \
+    chmod +x /app/docker/entrypoint-worker.sh && \
     chown -R appuser:appuser /app
 
 USER appuser
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]

@@ -4,24 +4,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    entrypoint: ["/app/docker/entrypoint-web.sh"]
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "${GUNICORN_WORKERS:-3}", "--timeout", "${GUNICORN_TIMEOUT:-60}"]
     restart: always
     stop_grace_period: 2m
     env_file:
       - .env
     environment:
-      - 'DJANGO_SETTINGS_MODULE=config.settings.production'
+      - DJANGO_SETTINGS_MODULE=config.settings.production
     expose:
       - "8000"
     healthcheck:
       test:
-        - CMD
-        - curl
-        - '-f'
-        - 'http://localhost:8000/health/'
+        - CMD-SHELL
+        - "curl -fsS http://localhost:8000/health/ || exit 1"
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -37,13 +37,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: 'python manage.py run_outbox_worker'
+    entrypoint: ["/app/docker/entrypoint-worker.sh"]
+    command: ["python", "manage.py", "run_outbox_worker"]
     restart: always
     stop_grace_period: 5m
     env_file:
       - .env
     environment:
-      - 'LOG_LEVEL=${LOG_LEVEL:-INFO}'
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     deploy:
       resources:
         limits:
