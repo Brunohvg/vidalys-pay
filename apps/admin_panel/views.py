@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date
 
@@ -8,6 +9,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -16,6 +18,7 @@ from apps.notifications.whatsapp_service import (
     queue_payment_link_created,
 )
 from apps.payment_links.use_cases import create_payment_link
+from apps.freight.services import format_price_cents
 from apps.sellers.models import Seller, SellerInvitation
 from apps.sellers.services import generate_invitation
 
@@ -247,20 +250,128 @@ def delete_seller(request, seller_id):
     return redirect("admin_panel:seller_list")
 
 
-# ── Create link ──────────────────────────────────────────────────────────────
+# ── Create link (old route) ──────────────────────────────────────────────────
 
 
 @admin_required
 def create_link(request, seller_id):
+    """Redirect to standalone create link with seller pre-selected."""
     seller = get_object_or_404(Seller, id=seller_id)
+    return redirect(f"{reverse('admin_panel:create_link_standalone')}?seller={seller.id}")
+
+
+# ── Create link standalone ───────────────────────────────────────────────────
+
+
+@admin_required
+def create_link_standalone(request):
+    """Centralized link creation — select any active seller."""
+    seller_id = request.GET.get("seller", "").strip()
+    active_sellers = Seller.objects.filter(is_active=True).order_by("name")
+    sellers_json = json.dumps([
+        {
+            "id": str(s.id),
+            "name": s.name,
+            "whatsapp_phone": s.whatsapp_phone,
+            "limit_formatted": format_price_cents(s.max_payment_amount_cents),
+            "limit_cents": s.max_payment_amount_cents,
+        }
+        for s in active_sellers
+    ])
+
+    context = {
+        "active_page": "create_link",
+        "sellers": active_sellers,
+        "sellers_json": sellers_json,
+        "selected_seller_id": seller_id if seller_id else "",
+    }
 
     if request.method == "POST":
-        return _handle_create_link_post(request, seller)
+        return _handle_standalone_create_link_post(request, context)
 
-    return render(request, "panel/payment_links/create.html", {
-        "active_page": "sellers",
+    return render(request, "panel/payment_links/create_standalone.html", context)
+
+
+def _handle_standalone_create_link_post(request, context):
+    seller_id = request.POST.get("seller_id", "").strip()
+    if not seller_id:
+        context["error"] = "Selecione um vendedor."
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    try:
+        seller = Seller.objects.get(id=seller_id, is_active=True)
+    except Seller.DoesNotExist:
+        context["error"] = "Vendedor não encontrado ou inativo."
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    amount_display = request.POST.get("amount_display", "").strip()
+    installments = request.POST.get("installments", "1").strip()
+    customer_name = request.POST.get("customer_name", "").strip() or None
+    customer_phone = request.POST.get("customer_phone", "").strip() or None
+
+    try:
+        clean = amount_display.replace(".", "").replace(",", ".")
+        amount_cents = int(float(clean) * 100)
+    except (ValueError, TypeError):
+        context["error"] = "Informe um valor válido."
+        context["form_data"] = {"amount_display": amount_display, "installments": int(installments), "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    try:
+        installments = int(installments)
+    except (ValueError, TypeError):
+        installments = 1
+
+    if amount_cents > seller.max_payment_amount_cents:
+        context["error"] = f"O valor excede o limite do vendedor ({format_price_cents(seller.max_payment_amount_cents)})."
+        context["form_data"] = {"amount_display": amount_display, "installments": installments, "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    today = date.today()
+    ref_suffix = uuid.uuid4().hex[:4].upper()
+    reference = f"{today.strftime('%Y%m%d')}-{ref_suffix}"
+    idempotency_key = str(uuid.uuid4())
+
+    result = create_payment_link(
+        seller=seller, reference=reference, amount_cents=amount_cents,
+        installments=installments, idempotency_key=idempotency_key,
+        customer_name=customer_name, customer_phone=customer_phone,
+    )
+
+    if not result.success:
+        context["error"] = result.error_message
+        context["form_data"] = {"amount_display": amount_display, "installments": installments, "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    payment_link = result.payment_link
+    whatsapp_status = None
+    if payment_link.payment_url:
+        queue_payment_link_created(seller=seller, payment_link=payment_link)
+        whatsapp_status = "ENVIADO"
+
+    context.update({
+        "success": True,
         "seller": seller,
+        "payment_link": payment_link,
+        "whatsapp_status": whatsapp_status,
     })
+    return render(request, "panel/payment_links/create_standalone.html", context)
+
+
+# ── Settings ─────────────────────────────────────────────────────────────────
+
+
+@admin_required
+@require_GET
+def settings_page(request):
+    webhook_url = request.build_absolute_uri("/api/v1/webhooks/pagarme/")
+    return render(request, "panel/settings.html", {
+        "active_page": "settings",
+        "webhook_url": webhook_url,
+    })
+
+
+# ── Create link (legacy post handler, now unused) ────────────────────────────
 
 
 def _handle_create_link_post(request, seller):
@@ -273,16 +384,12 @@ def _handle_create_link_post(request, seller):
         clean = amount_display.replace(".", "").replace(",", ".")
         amount_cents = int(float(clean) * 100)
     except (ValueError, TypeError):
-        return render(request, "panel/payment_links/create.html", {
-            "active_page": "sellers",
+        return render(request, "panel/payment_links/create_standalone.html", {
+            "active_page": "create_link",
+            "sellers": Seller.objects.filter(is_active=True).order_by("name"),
             "seller": seller,
             "error": "Informe um valor válido.",
-            "form_data": {
-                "amount_display": amount_display,
-                "installments": int(installments),
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-            },
+            "form_data": {"amount_display": amount_display, "installments": int(installments), "customer_name": customer_name, "customer_phone": customer_phone},
         })
 
     try:
@@ -293,30 +400,21 @@ def _handle_create_link_post(request, seller):
     today = date.today()
     ref_suffix = uuid.uuid4().hex[:4].upper()
     reference = f"{today.strftime('%Y%m%d')}-{ref_suffix}"
-
     idempotency_key = str(uuid.uuid4())
 
     result = create_payment_link(
-        seller=seller,
-        reference=reference,
-        amount_cents=amount_cents,
-        installments=installments,
-        idempotency_key=idempotency_key,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
+        seller=seller, reference=reference, amount_cents=amount_cents,
+        installments=installments, idempotency_key=idempotency_key,
+        customer_name=customer_name, customer_phone=customer_phone,
     )
 
     if not result.success:
-        return render(request, "panel/payment_links/create.html", {
-            "active_page": "sellers",
+        return render(request, "panel/payment_links/create_standalone.html", {
+            "active_page": "create_link",
+            "sellers": Seller.objects.filter(is_active=True).order_by("name"),
             "seller": seller,
             "error": result.error_message,
-            "form_data": {
-                "amount_display": amount_display,
-                "installments": installments,
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-            },
+            "form_data": {"amount_display": amount_display, "installments": installments, "customer_name": customer_name, "customer_phone": customer_phone},
         })
 
     payment_link = result.payment_link
@@ -325,8 +423,9 @@ def _handle_create_link_post(request, seller):
         queue_payment_link_created(seller=seller, payment_link=payment_link)
         whatsapp_status = "ENVIADO"
 
-    return render(request, "panel/payment_links/create.html", {
-        "active_page": "sellers",
+    return render(request, "panel/payment_links/create_standalone.html", {
+        "active_page": "create_link",
+        "sellers": Seller.objects.filter(is_active=True).order_by("name"),
         "seller": seller,
         "success": True,
         "payment_link": payment_link,

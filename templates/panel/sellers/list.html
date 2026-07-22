@@ -16,7 +16,7 @@
 <div class="panel-search">
     <form method="get" class="panel-search__form" id="searchForm">
         <svg class="panel-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" name="q" class="panel-search__input" placeholder="Buscar por nome, e-mail ou telefone..."
+        <input type="text" name="q" class="panel-search__input" placeholder="Buscar por nome ou telefone..."
                value="{{ query|default:'' }}" autocomplete="off">
         {% if query %}
         <a href="{% url 'admin_panel:seller_list' %}" class="panel-search__clear" aria-label="Limpar busca">
@@ -28,7 +28,6 @@
         <a href="{% url 'admin_panel:seller_list' %}" class="panel-filter{% if not status_filter %} active{% endif %}">Todos</a>
         <a href="?status=active{% if query %}&q={{ query }}{% endif %}" class="panel-filter{% if status_filter == 'active' %} active{% endif %}">Ativos</a>
         <a href="?status=inactive{% if query %}&q={{ query }}{% endif %}" class="panel-filter{% if status_filter == 'inactive' %} active{% endif %}">Inativos</a>
-        <a href="?status=pending{% if query %}&q={{ query }}{% endif %}" class="panel-filter{% if status_filter == 'pending' %} active{% endif %}">Convite pendente</a>
     </div>
     {% if query or status_filter %}
     <p class="panel-search__count">{{ total_count }} vendedor{{ total_count|pluralize:"es" }} encontrado{{ total_count|pluralize:"s" }}</p>
@@ -36,65 +35,70 @@
 </div>
 
 {% if sellers %}
-<div class="panel-seller-list">
-    {% for item in sellers %}
-    <div class="panel-seller-card">
-        <div class="panel-seller-card__header">
-            <div>
-                <div class="panel-seller-card__name">{{ item.seller.name }}</div>
-                <div class="panel-seller-card__phone">{{ item.seller.whatsapp_phone }}</div>
-            </div>
-            <div class="panel-seller-card__badges">
-                {% if item.seller.is_active %}
-                <span class="panel-badge panel-badge--active">Ativo</span>
-                {% else %}
-                <span class="panel-badge panel-badge--inactive">Inativo</span>
-                {% endif %}
-                {% if item.active_invitation %}
-                <span class="panel-badge panel-badge--sent">Convite ativo</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="panel-seller-card__meta">
-            <span>Limite: {{ item.seller.max_payment_amount_cents|format_brl }}</span>
-            <span>Criado {{ item.seller.created_at|date:"d/m/Y" }}</span>
-        </div>
-
-        {% if item.active_invitation %}
-        <div class="panel-seller-card__expiry">Convite expira {{ item.active_invitation.expires_at|date:"d/m/Y H:i" }}</div>
-        {% endif %}
-
-        <div class="panel-seller-card__actions">
-            <a href="{% url 'admin_panel:create_link' seller_id=item.seller.id %}" class="panel-btn panel-btn--primary panel-btn--sm" style="text-decoration:none;">Criar link</a>
-
-            <div class="panel-seller-card__actions-group">
-                <form method="post" action="{% url 'admin_panel:regenerate_invitation' seller_id=item.seller.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="panel-btn panel-btn--ghost panel-btn--sm">Reenviar</button>
-                </form>
-                {% if item.active_invitation %}
-                <form method="post" action="{% url 'admin_panel:revoke_invitation' seller_id=item.seller.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="panel-btn panel-btn--ghost panel-btn--sm">Revogar</button>
-                </form>
-                {% endif %}
-                <form method="post" action="{% url 'admin_panel:toggle_seller' seller_id=item.seller.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="panel-btn panel-btn--ghost panel-btn--sm">
-                        {% if item.seller.is_active %}Desativar{% else %}Ativar{% endif %}
-                    </button>
-                </form>
-            </div>
-        </div>
-        <div class="panel-seller-card__danger">
-            <button type="button" class="panel-btn panel-btn--danger-text panel-btn--sm"
-                    onclick="confirmAction('Excluir vendedor?', '{{ item.seller.name|escapejs }} perderá o acesso permanentemente.', '{% url 'admin_panel:delete_seller' seller_id=item.seller.id %}', 'Excluir vendedor')">
-                Excluir
-            </button>
-        </div>
-    </div>
-    {% endfor %}
+<div class="panel-table-wrapper">
+    <table class="panel-table">
+        <thead>
+            <tr>
+                <th>Vendedor</th>
+                <th>WhatsApp</th>
+                <th class="panel-table__hide-mobile">Limite</th>
+                <th class="panel-table__hide-mobile">Status</th>
+                <th class="panel-table__hide-mobile">Convite</th>
+                <th class="panel-table__hide-mobile">Criado em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sellers %}
+            <tr>
+                <td><span class="panel-table__name">{{ item.seller.name }}</span></td>
+                <td><span class="panel-table__phone">{{ item.seller.whatsapp_phone }}</span></td>
+                <td class="panel-table__hide-mobile">{{ item.seller.max_payment_amount_cents|format_brl }}</td>
+                <td class="panel-table__hide-mobile">
+                    {% if item.seller.is_active %}
+                    <span class="panel-badge panel-badge--active">Ativo</span>
+                    {% else %}
+                    <span class="panel-badge panel-badge--inactive">Inativo</span>
+                    {% endif %}
+                </td>
+                <td class="panel-table__hide-mobile">
+                    {% if item.active_invitation %}
+                    <span class="panel-badge panel-badge--sent">Enviado</span>
+                    {% else %}
+                    <span style="font-size:0.75rem;color:var(--color-gray-400);">—</span>
+                    {% endif %}
+                </td>
+                <td class="panel-table__hide-mobile">{{ item.seller.created_at|date:"d/m/Y" }}</td>
+                <td>
+                    <div class="panel-table__actions">
+                        <a href="{% url 'admin_panel:create_link' seller_id=item.seller.id %}" class="panel-btn panel-btn--primary panel-btn--xs">Criar link</a>
+                        <button type="button" class="panel-btn panel-btn--ghost panel-btn--xs panel-table__more" onclick="toggleActions(this)" aria-label="Mais ações">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                        <div class="panel-table__dropdown">
+                            <form method="post" action="{% url 'admin_panel:regenerate_invitation' seller_id=item.seller.id %}">
+                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">Reenviar convite</button>
+                            </form>
+                            {% if item.active_invitation %}
+                            <form method="post" action="{% url 'admin_panel:revoke_invitation' seller_id=item.seller.id %}">
+                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">Revogar convite</button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="{% url 'admin_panel:toggle_seller' seller_id=item.seller.id %}">
+                                {% csrf_token %}<button type="submit" class="panel-table__dropdown-item">{% if item.seller.is_active %}Desativar{% else %}Ativar{% endif %}</button>
+                            </form>
+                            <hr>
+                            <button type="button" class="panel-table__dropdown-item panel-table__dropdown-item--danger"
+                                    onclick="confirmAction('Excluir vendedor?', '{{ item.seller.name|escapejs }} perderá o acesso.', '{% url 'admin_panel:delete_seller' seller_id=item.seller.id %}', 'Excluir vendedor')">
+                                Excluir
+                            </button>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 {% if total_count > 25 %}
@@ -110,6 +114,22 @@
 {% endif %}
 
 {% else %}
-{% include "panel/components/empty_state.html" with title="Nenhum vendedor encontrado" text="Tente outro nome, telefone ou remova os filtros." %}
+{% include "panel/components/empty_state.html" with title="Nenhum vendedor encontrado" text="Tente outro nome ou remova os filtros." %}
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleActions(btn) {
+    var dropdown = btn.parentElement.querySelector('.panel-table__dropdown');
+    var isOpen = dropdown.classList.contains('open');
+    document.querySelectorAll('.panel-table__dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    if (!isOpen) dropdown.classList.add('open');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.panel-table__more')) {
+        document.querySelectorAll('.panel-table__dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    }
+});
+</script>
 {% endblock %}

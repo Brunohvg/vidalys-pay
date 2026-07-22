@@ -12,6 +12,9 @@ urlpatterns = [
     # Dashboard
     path("", views.dashboard, name="dashboard"),
 
+    # Link creation
+    path("links/criar/", views.create_link_standalone, name="create_link_standalone"),
+
     # Seller management
     path("vendedores/", views.seller_list, name="seller_list"),
     path("vendedores/criar/", views.create_seller_page, name="create_seller_page"),
@@ -23,4 +26,7 @@ urlpatterns = [
     path("<uuid:seller_id>/revogar-convite/", views.revoke_invitation, name="revoke_invitation"),
     path("<uuid:seller_id>/excluir/", views.delete_seller, name="delete_seller"),
     path("<uuid:seller_id>/criar-link/", views.create_link, name="create_link"),
+
+    # Settings
+    path("configuracoes/", views.settings_page, name="settings_page"),
 ]
