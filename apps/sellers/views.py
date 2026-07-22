@@ -3,6 +3,9 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.sessions.backends.db import SessionStore
+from django.contrib.sessions.models import Session
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -10,7 +13,13 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .decorators import seller_login_required
 from .models import SellerSession
-from .services import consume_invitation, revoke_all_sessions
+from .services import (
+    activate_session,
+    generate_invitation,
+    get_seller_from_session,
+    revoke_all_sessions,
+    validate_invitation,
+)
 
 logger = logging.getLogger("apps.sellers")
 
@@ -20,44 +29,67 @@ logger = logging.getLogger("apps.sellers")
 
 @require_GET
 def activate_invitation(request, token):
-    """Activate an invitation from WhatsApp link.
+    """Show confirmation page. Does NOT consume the invitation."""
+    context, error_message, _token_hash = validate_invitation(raw_token=token)
 
-    Consumes the token atomically and creates a session.
-    Redirects to /app on success.
-    """
-    seller, error_message = consume_invitation(raw_token=token)
-
-    if seller is None:
+    if context is None:
         return render(request, "sellers/activation_invalid.html", {
-            "error_message": error_message or "Este link de acesso não é válido, já foi utilizado ou expirou.",
+            "error_message": error_message or "Este link de acesso não é válido.",
         }, status=400)
+
+    request.session["_invitation_token_hash"] = _token_hash
+    if request.session.session_key is None:
+        request.session.create()
+
+    return render(request, "sellers/activation_confirm.html", {
+        "seller_name": context["seller_name"],
+        "token": token,
+    })
+
+
+@require_POST
+def confirm_activation(request, token):
+    """Confirm activation: create session and consume invitation atomically."""
+    stored_hash = request.session.pop("_invitation_token_hash", None)
+    if stored_hash is None:
+        context, error_message, _token_hash = validate_invitation(raw_token=token)
+        if context is None:
+            return render(request, "sellers/activation_invalid.html", {
+                "error_message": error_message or "Este link de acesso não é válido.",
+            }, status=400)
+        stored_hash = _token_hash
 
     ip = _get_client_ip(request)
     user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
 
-    now = timezone.now()
-    session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
+    def create_session_callback(seller):
+        """Callback that creates the Django session inside the atomic block."""
+        request.session.cycle_key()
+        request.session["seller_id"] = str(seller.id)
 
-    request.session["seller_id"] = str(seller.id)
-    if request.session.session_key is None:
-        request.session.create()
-    else:
-        request.session.modified = True
+        session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
+        session_seconds = session_days * 24 * 60 * 60
+        request.session.set_expiry(session_seconds)
+        request.session.save()
 
-    SellerSession.objects.create(
-        seller=seller,
-        django_session_key=request.session.session_key,
-        ip_first=ip,
-        user_agent_summary=user_agent,
-        expires_at=now + timedelta(days=session_days),
-        last_seen_at=now,
+        return SessionData(
+            session_key=request.session.session_key,
+            session_data={"seller_id": str(seller.id)},
+        )
+
+    seller_session, error_message = activate_session(
+        token_hash=stored_hash,
+        request_ip=ip,
+        user_agent=user_agent,
+        get_response_callback=create_session_callback,
     )
 
-    logger.info("Sessão criada para vendedor %s", seller.id)
+    if seller_session is None:
+        return render(request, "sellers/activation_invalid.html", {
+            "error_message": error_message or "Não foi possível ativar o convite.",
+        }, status=400)
 
-    response = redirect("/app/")
-    response["Referrer-Policy"] = "no-referrer"
-    return response
+    return redirect("sellers:app_new_link")
 
 
 # --- App Pages ---
@@ -66,7 +98,6 @@ def activate_invitation(request, token):
 @seller_login_required
 @require_GET
 def app_new_link(request):
-    """New payment link form page."""
     seller = request.seller
     return render(request, "sellers/app_new_link.html", {
         "seller": seller,
@@ -77,7 +108,6 @@ def app_new_link(request):
 @seller_login_required
 @require_GET
 def app_history(request):
-    """Payment links history page."""
     seller = request.seller
     from apps.payment_links.models import PaymentLink
 
@@ -100,10 +130,7 @@ def app_history(request):
 @seller_login_required
 @require_GET
 def app_profile(request):
-    """Seller profile page."""
     seller = request.seller
-    from apps.sellers.models import SellerSession
-
     sessions = SellerSession.objects.filter(
         seller=seller,
         revoked_at__isnull=True,
@@ -119,7 +146,6 @@ def app_profile(request):
 @seller_login_required
 @require_GET
 def app_success(request):
-    """Payment link created success page."""
     seller = request.seller
     link_id = request.GET.get("link_id")
 
@@ -136,13 +162,21 @@ def app_success(request):
     })
 
 
+# --- Session invalid page ---
+
+
+@require_GET
+def session_invalid(request):
+    """Friendly page shown when seller session is invalid."""
+    return render(request, "sellers/session_invalid.html", status=401)
+
+
 # --- API (JSON) ---
 
 
 @seller_login_required
 @require_GET
 def seller_profile(request):
-    """Return seller profile as JSON."""
     seller = request.seller
     return JsonResponse({
         "data": {
@@ -155,15 +189,10 @@ def seller_profile(request):
 
 @require_POST
 def seller_logout(request):
-    """Logout current seller session."""
-    from django.utils import timezone
-
     seller_id = request.session.get("seller_id")
     session_key = request.session.session_key
 
     if seller_id and session_key:
-        from .models import SellerSession
-
         SellerSession.objects.filter(
             django_session_key=session_key,
             seller_id=seller_id,
@@ -175,11 +204,9 @@ def seller_logout(request):
 
 @require_POST
 def seller_logout_all(request):
-    """Logout all sessions for current seller."""
     seller_id = request.session.get("seller_id")
     if seller_id:
         from .models import Seller
-
         try:
             seller = Seller.objects.get(id=seller_id)
             revoke_all_sessions(seller=seller)
@@ -201,7 +228,6 @@ def _get_client_ip(request) -> str | None:
 
 
 def _mask_phone(phone: str) -> str:
-    """Mask phone for display: +55319****9999."""
     if len(phone) <= 7:
         return phone
     return phone[:5] + "*" * (len(phone) - 8) + phone[-3:]
@@ -209,5 +235,14 @@ def _mask_phone(phone: str) -> str:
 
 @require_GET
 def index(request):
-    """Redireciona raiz para a página principal do app."""
     return redirect("sellers:app_new_link")
+
+
+# --- Internal helpers ---
+
+
+class SessionData:
+    """Simple container for session data passed from view callback to service."""
+    def __init__(self, session_key: str, session_data: dict):
+        self.session_key = session_key
+        self.session_data = session_data

@@ -1,12 +1,13 @@
 """Seller authentication middleware."""
+import logging
+
 from .services import get_seller_from_session
+
+logger = logging.getLogger("apps.sellers")
 
 
 class SellerSessionMiddleware:
-    """Attach seller to request if valid session exists.
-
-    Sets request.seller for authenticated seller requests.
-    """
+    """Attach seller to request if valid session exists."""
 
     def __init__(self, get_response):
         self.get_response = get_response
