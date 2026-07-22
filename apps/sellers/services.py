@@ -57,17 +57,16 @@ def generate_invitation(*, seller: Seller, created_by=None) -> tuple[SellerInvit
     return invitation, raw_token
 
 
-def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_agent: str = "") -> SellerSession | None:
+def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_agent: str = "") -> tuple[SellerSession | None, str | None]:
     """Atomically consume a valid invitation and create a session.
 
-    Returns SellerSession if successful, None if invalid.
+    Returns (SellerSession, None) if successful, (None, error_message) if invalid.
     """
     token_hash = _hash_token(raw_token)
 
     now = timezone.now()
 
     with transaction.atomic():
-        # Lock the invitation row
         invitation = (
             SellerInvitation.objects.select_for_update()
             .filter(token_hash=token_hash)
@@ -76,45 +75,37 @@ def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_ag
 
         if invitation is None:
             logger.warning("Convite não encontrado para hash")
-            return None
+            return None, "Link não encontrado. Solicite um novo convite."
 
-        # Check if already used
         if invitation.used_at is not None:
             logger.warning("Convite já utilizado: %s", invitation.id)
-            return None
+            return None, "Este link já foi utilizado."
 
-        # Check if revoked
         if invitation.revoked_at is not None:
             logger.warning("Convite revogado: %s", invitation.id)
-            return None
+            return None, "Este link foi revogado. Solicite um novo convite."
 
-        # Check expiration
         if invitation.expires_at < now:
             logger.warning("Convite expirado: %s", invitation.id)
-            return None
+            return None, "Este link expirou. Solicite um novo convite."
 
-        # Check if seller is active
         seller = invitation.seller
         if not seller.is_active:
             logger.warning("Vendedor inativo: %s", seller.id)
-            return None
+            return None, "Seu acesso foi desativado. Entre em contato com o administrador."
 
-        # Mark as used
         invitation.used_at = now
         invitation.save(update_fields=["used_at"])
 
-        # Create Django session
         from django.contrib.sessions.backends.db import SessionStore
 
         django_session = SessionStore()
         django_session["seller_id"] = str(seller.id)
         django_session.create()
 
-        # Calculate session expiration
         session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
         session_expires = now + timedelta(days=session_days)
 
-        # Create seller session record
         seller_session = SellerSession.objects.create(
             seller=seller,
             django_session_key=django_session.session_key,
@@ -125,7 +116,7 @@ def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_ag
         )
 
     logger.info("Sessão criada para vendedor %s, sessão %s", seller.id, seller_session.id)
-    return seller_session
+    return seller_session, None
 
 
 def revoke_all_sessions(*, seller: Seller) -> int:

@@ -89,3 +89,30 @@ def regenerate_invitation(request, seller_id):
 
     messages.success(request, f"Novo convite enviado para {seller.whatsapp_phone}.")
     return redirect("admin_panel:dashboard")
+
+
+@admin_required
+@require_POST
+def revoke_invitation(request, seller_id):
+    seller = get_object_or_404(Seller, id=seller_id)
+    count = SellerInvitation.objects.filter(
+        seller=seller,
+        used_at__isnull=True,
+        revoked_at__isnull=True,
+    ).update(revoked_at=timezone.now())
+
+    if count:
+        messages.success(request, f"Convite de {seller.name} revogado.")
+    else:
+        messages.warning(request, f"{seller.name} não possui convite ativo para revogar.")
+    return redirect("admin_panel:dashboard")
+
+
+@admin_required
+@require_POST
+def delete_seller(request, seller_id):
+    seller = get_object_or_404(Seller, id=seller_id)
+    name = seller.name
+    seller.delete()
+    messages.success(request, f"Vendedor '{name}' excluído permanentemente.")
+    return redirect("admin_panel:dashboard")

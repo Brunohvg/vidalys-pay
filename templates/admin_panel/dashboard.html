@@ -76,13 +76,25 @@
                         {% csrf_token %}
                         <button type="submit" class="seller-card__action seller-card__action--whatsapp">Reenviar</button>
                     </form>
+                    {% if item.active_invitation %}
+                    <form method="post" action="{% url 'admin_panel:revoke_invitation' seller_id=item.seller.id %}" style="flex:1;display:flex;">
+                        {% csrf_token %}
+                        <button type="submit" class="seller-card__action">Revogar</button>
+                    </form>
+                    {% endif %}
                     <form method="post" action="{% url 'admin_panel:toggle_seller' seller_id=item.seller.id %}" style="flex:1;display:flex;">
                         {% csrf_token %}
                         {% if item.seller.is_active %}
-                            <button type="submit" class="seller-card__action seller-card__action--danger">Desativar</button>
+                            <button type="submit" class="seller-card__action">Desativar</button>
                         {% else %}
                             <button type="submit" class="seller-card__action">Ativar</button>
                         {% endif %}
+                    </form>
+                </div>
+                <div style="margin-top:var(--space-2);text-align:right;">
+                    <form method="post" action="{% url 'admin_panel:delete_seller' seller_id=item.seller.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="seller-card__action seller-card__action--danger" onclick="return confirm('Excluir permanentemente {{ item.seller.name|escapejs }}?')" style="flex:none;padding:var(--space-1) var(--space-3);">Excluir</button>
                     </form>
                 </div>
             </div>

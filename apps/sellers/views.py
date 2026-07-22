@@ -24,14 +24,16 @@ def activate_invitation(request, token):
     ip = _get_client_ip(request)
     user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
 
-    seller_session = consume_invitation(
+    seller_session, error_message = consume_invitation(
         raw_token=token,
         request_ip=ip,
         user_agent=user_agent,
     )
 
     if seller_session is None:
-        return render(request, "sellers/activation_invalid.html", status=400)
+        return render(request, "sellers/activation_invalid.html", {
+            "error_message": error_message or "Este link de acesso não é válido, já foi utilizado ou expirou.",
+        }, status=400)
 
     # Migrate session data to current request session
     from django.contrib.sessions.backends.db import SessionStore

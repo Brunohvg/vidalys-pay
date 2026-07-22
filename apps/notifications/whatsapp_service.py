@@ -169,7 +169,6 @@ def _queue_message(
     dedup_key = f"{aggregate_type}:{aggregate_id}:{template_key}"
 
     with transaction.atomic():
-        # Check for existing pending message (dedup)
         existing = NotificationOutbox.objects.filter(
             deduplication_key=dedup_key,
             status__in=["PENDING", "PROCESSING"],
@@ -177,14 +176,14 @@ def _queue_message(
 
         if existing:
             logger.info("Mensagem duplicada ignorada: %s", dedup_key)
-            # Return existing WhatsApp message if any
             return WhatsAppMessage.objects.filter(
                 seller=seller,
                 template_key=template_key,
                 payment_link=payment_link,
             ).order_by("-created_at").first()
 
-        # Create WhatsApp message record
+        NotificationOutbox.objects.filter(deduplication_key=dedup_key).delete()
+
         message = WhatsAppMessage.objects.create(
             seller=seller,
             payment_link=payment_link,

@@ -20,7 +20,7 @@
         <div style="font-size: 48px; margin-bottom: var(--space-4);">🔒</div>
         <h1 style="font-size: var(--text-xl); font-weight: 700; color: var(--color-navy-900); margin-bottom: var(--space-3);">Acesso inválido</h1>
         <p style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-6); line-height: 1.5;">
-            Este link de acesso não é válido, já foi utilizado ou expirou.<br>
+            {{ error_message|default:"Este link de acesso não é válido, já foi utilizado ou expirou." }}<br>
             Solicite um novo convite ao administrador.
         </p>
         <a href="/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-8);">Voltar</a>
