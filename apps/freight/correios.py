@@ -87,7 +87,9 @@ class CorreiosAuthClient:
             if self._config.contrato != "":
                 body["contrato"] = self._config.contrato
             if self._config.dr != "":
-                body["dr"] = int(self._config.dr)
+                dr_value = _parse_dr(self._config.dr)
+                if dr_value is not None:
+                    body["dr"] = dr_value
 
         timeout = httpx.Timeout(
             self._config.connect_timeout,
@@ -154,6 +156,17 @@ class CorreiosAuthClient:
             {"access_token": token_data.access_token},
             timeout=ttl,
         )
+
+
+def _parse_dr(value: str) -> int | None:
+    """Parse DR field to int, returning None if invalid."""
+    if not value or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        logger.warning("correios_dr_invalido=true dr_value=%s", value)
+        return None
 
 
 def _sanitize_response_text(text: str, max_length: int = 300) -> str:
@@ -269,7 +282,9 @@ class CorreiosFreightClient:
             if self._config.contrato != "":
                 param["nuContrato"] = self._config.contrato
             if self._config.dr != "":
-                param["nuDR"] = int(self._config.dr)
+                dr_value = _parse_dr(self._config.dr)
+                if dr_value is not None:
+                    param["nuDR"] = dr_value
 
             if package.declared_value_cents > 0:
                 param["vlDeclarado"] = str(

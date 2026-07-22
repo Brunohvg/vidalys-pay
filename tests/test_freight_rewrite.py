@@ -8,6 +8,7 @@ import pytest
 from apps.freight.correios import (
     CorreiosAuthClient,
     CorreiosFreightClient,
+    _parse_dr,
     _parse_price,
     calculate_token_ttl,
 )
@@ -578,6 +579,107 @@ def test_batch_price_omits_nuContrato_when_empty(mock_token, mock_config, mock_p
     params = payload["parametrosProduto"][0]
 
     assert "nuContrato" not in params
+
+
+# --- DR parsing ---
+
+
+def test_parse_dr_zero_returns_int():
+    assert _parse_dr("0") == 0
+    assert isinstance(_parse_dr("0"), int)
+
+
+def test_parse_dr_positive_returns_int():
+    assert _parse_dr("10") == 10
+
+
+def test_parse_dr_empty_returns_none():
+    assert _parse_dr("") is None
+
+
+def test_parse_dr_invalid_string_returns_none():
+    assert _parse_dr("SE-MG") is None
+
+
+def test_parse_dr_non_numeric_returns_none():
+    assert _parse_dr("abc") is None
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_invalid_dr_omitted(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="SE-MG",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert body["numero"] == "74835858"
+    assert body["contrato"] == "9912464418"
+    assert "dr" not in body
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+@patch("apps.freight.correios.CorreiosAuthClient.get_token")
+def test_batch_price_invalid_dr_omitted(mock_token, mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="SE-MG",
+        cep_origem="30170130",
+        pac_product_code="03298",
+        sedex_product_code="03220",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_token.return_value = "fake-token"
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = [
+        {"coProduto": "03298", "pcFinal": "25,00"},
+    ]
+    mock_post.return_value = mock_response
+
+    package = PackageData(
+        destination_zip_code="30140071",
+        weight_grams=500,
+        length_cm="20",
+        width_cm="15",
+        height_cm="10",
+    )
+
+    client = CorreiosFreightClient()
+    client._batch_price("fake-token", ["03298"], package)
+
+    call_kwargs = mock_post.call_args.kwargs
+    payload = call_kwargs["json"]
+    params = payload["parametrosProduto"][0]
+
+    assert "nuDR" not in params
+    assert params["nuContrato"] == "9912464418"
 
 
 # --- Sanitization helpers ---
