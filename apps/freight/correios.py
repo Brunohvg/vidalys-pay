@@ -116,7 +116,7 @@ class CorreiosAuthClient:
                 "Os Correios demoraram para responder. Tente novamente."
             ) from exc
         except httpx.HTTPStatusError as exc:
-            self._log_http_error("autenticacao", exc)
+            _log_http_error("autenticacao", exc)
             if exc.response.status_code in (401, 403):
                 raise FreightAuthenticationError(
                     "Não foi possível autenticar nos Correios. Verifique a configuração."
