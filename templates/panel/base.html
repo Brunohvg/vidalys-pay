@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+﻿{% load static %}<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -19,12 +19,12 @@
     {% include "panel/components/sidebar.html" %}
 
     <div class="admin-main">
-        {% include "panel/components/topbar.html" %}
+        <header class="admin-topbar"><button class="admin-topbar__menu" id="menuBtn" aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="admin-topbar__title"><h1>{% block page_title %}Painel{% endblock %}</h1>{% block page_description %}{% endblock %}</div><div class="admin-topbar__actions">{% block header_action %}{% endblock %}</div></header>
 
         {% if messages %}
-        <div class="messages" aria-live="polite">
+        <div class="panel-messages" aria-live="polite">
             {% for m in messages %}
-            <div class="msg msg--{{ m.tags|default:'info' }}">
+            <div class="panel-message panel-message--{{ m.tags|default:'info' }}">
                 {% if m.tags == 'success' %}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 {% elif m.tags == 'error' %}
@@ -34,8 +34,8 @@
                 {% else %}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                 {% endif %}
-                <span class="msg__text">{{ m }}</span>
-                <button class="msg__close" onclick="this.parentElement.remove()" aria-label="Fechar">
+                <span class="panel-message__text">{{ m }}</span>
+                <button class="panel-message__close" onclick="this.parentElement.remove()" aria-label="Fechar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>

@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <aside class="admin-sidebar" id="sidebar" aria-label="Navegação">
     <div class="admin-sidebar__brand">
         <a href="{% url 'admin_panel:dashboard' %}">
@@ -42,7 +42,7 @@
     </nav>
 
     <div class="admin-sidebar__footer">
-        <div class="admin-sidebar__user">{{ user.username }}<small>{{ user.email }}</small></div>
+        <div class="admin-sidebar__user"><div class="admin-sidebar__avatar">{{ user.username|slice:":1"|upper }}</div><div><div class="admin-sidebar__user-name">{{ user.username }}</div><small class="admin-sidebar__user-email">{{ user.email }}</small></div></div>
         <form method="post" action="{% url 'admin_panel:logout' %}">
             {% csrf_token %}
             <button class="admin-sidebar__logout">

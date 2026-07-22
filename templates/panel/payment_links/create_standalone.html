@@ -1,69 +1,70 @@
-{% extends "panel/base.html" %}
+﻿{% extends "panel/base.html" %}
 {% load formatting %}
 
 {% block title %}Criar link{% endblock %}
 {% block page_title %}Criar link de pagamento{% endblock %}
+{% block page_description %}<p class="admin-topbar__desc">Gere uma cobrança segura em poucos passos</p>{% endblock %}
 
 {% block content %}
 
 {% if error %}
-<div class="msg msg--error" style="margin-bottom:16px"><span class="msg__text">{{ error }}</span></div>
+<div class="panel-message panel-message--error" style="margin-bottom:16px"><span class="panel-message__text">{{ error }}</span></div>
 {% endif %}
 
 {% if success %}
-<div class="card success">
-    <div class="success__icon">
+<div class="panel-card panel-card--success">
+    <div class="panel-success-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
     </div>
-    <h2 class="success__title">Link criado!</h2>
-    <div class="success__details">
-        <div class="success__row"><span>Vendedor</span><span>{{ seller.name }}</span></div>
-        <div class="success__row"><span>Valor</span><span class="success__amount">{{ payment_link.amount_cents|format_brl }}</span></div>
-        <div class="success__row"><span>Referência</span><span>{{ payment_link.reference }}</span></div>
-        <div class="success__row"><span>Parcelas</span><span>{{ payment_link.installments }}x sem juros</span></div>
+    <h2 class="panel-success-title">Link criado!</h2>
+    <div class="panel-success-details">
+        <div class="panel-success-row"><span>Vendedor</span><span>{{ seller.name }}</span></div>
+        <div class="panel-success-row"><span>Valor</span><span class="panel-success-amount">{{ payment_link.amount_cents|format_brl }}</span></div>
+        <div class="panel-success-row"><span>Referência</span><span>{{ payment_link.reference }}</span></div>
+        <div class="panel-success-row"><span>Parcelas</span><span>{{ payment_link.installments }}x sem juros</span></div>
         {% if payment_link.customer_name %}
-        <div class="success__row"><span>Cliente</span><span>{{ payment_link.customer_name }}</span></div>
+        <div class="panel-success-row"><span>Cliente</span><span>{{ payment_link.customer_name }}</span></div>
         {% endif %}
     </div>
     {% if whatsapp_status %}
-    <div class="whatsapp-ok">
+    <div class="panel-whatsapp-status">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
         Enviado ao WhatsApp do vendedor
     </div>
     {% endif %}
-    <div class="success__actions">
-        <button class="btn btn--primary btn--lg" onclick="copyUrl('{{ payment_link.payment_url }}')">Copiar link</button>
-        <button class="btn btn--outline btn--lg" onclick="window.open('{{ payment_link.payment_url }}','_blank')">Abrir link</button>
-        <a href="{% url 'admin_panel:create_link_standalone' %}" class="btn btn--ghost btn--lg">Criar outro</a>
+    <div class="panel-success-actions">
+        <button class="panel-btn panel-btn--primary panel-btn--lg" onclick="copyUrl('{{ payment_link.payment_url }}')">Copiar link</button>
+        <button class="panel-btn panel-btn--secondary panel-btn--lg" onclick="window.open('{{ payment_link.payment_url }}','_blank')">Abrir link</button>
+        <a href="{% url 'admin_panel:create_link_standalone' %}" class="panel-btn panel-btn--ghost panel-btn--lg">Criar outro</a>
     </div>
 </div>
 
 {% elif not sellers %}
-<div class="empty">
-    <div class="empty__icon">📋</div>
-    <h3 class="empty__title">Nenhum vendedor ativo</h3>
-    <p class="empty__text">Cadastre um vendedor antes de criar links.</p>
-    <a href="{% url 'admin_panel:create_seller_page' %}" class="empty__action">Adicionar vendedor</a>
+<div class="panel-empty">
+    <div class="panel-empty__icon">◎</div>
+    <h3 class="panel-empty__title">Nenhum vendedor ativo</h3>
+    <p class="panel-empty__text">Cadastre um vendedor antes de criar links.</p>
+    <a href="{% url 'admin_panel:create_seller_page' %}" class="panel-empty__action">Adicionar vendedor</a>
 </div>
 
 {% else %}
-<div class="create-layout">
+<div class="panel-create-layout">
     <div>
         <form method="post" id="createLinkForm">
             {% csrf_token %}
 
-            <div class="card">
-                <div class="field">
-                    <label class="field__label">Vendedor responsável</label>
-                    <div class="search-drop">
-                        <input type="text" id="sellerSearch" class="field__input" placeholder="Buscar vendedor…" autocomplete="off">
-                        <div class="search-drop__results" id="sellerResults">
+            <div class="panel-card">
+                <div class="panel-field">
+                    <label class="panel-field__label">Vendedor responsável</label>
+                    <div class="panel-seller-search">
+                        <input type="text" id="sellerSearch" class="panel-field__input" placeholder="Buscar vendedor…" autocomplete="off">
+                        <div class="panel-seller-search__results" id="sellerResults">
                             {% for s in sellers %}
-                            <button type="button" class="search-drop__item" data-id="{{ s.id }}"
+                            <button type="button" class="panel-seller-search__item" data-id="{{ s.id }}"
                                     data-name="{{ s.name|escapejs }}" data-phone="{{ s.whatsapp_phone|escapejs }}"
                                     data-limit="{{ s.max_payment_amount_cents }}">
-                                <span class="search-drop__item-name">{{ s.name }}</span>
-                                <span class="search-drop__item-phone">{{ s.whatsapp_phone }}</span>
+                                <span class="panel-seller-search__item-name">{{ s.name }}</span>
+                                <span class="panel-seller-search__item-phone">{{ s.whatsapp_phone }}</span>
                             </button>
                             {% endfor %}
                         </div>
@@ -71,60 +72,62 @@
                     <input type="hidden" id="sellerId" name="seller_id" value="{{ selected_seller_id|default:'' }}">
                 </div>
 
-                <div id="sellerSummary" class="seller-summary" style="display:none">
-                    <div class="dash-seller__avatar" id="sumAvatar"></div>
+                <div id="sellerSummary" class="panel-seller-summary" style="display:none">
+                    <div class="panel-seller-avatar" id="sumAvatar"></div>
                     <div>
-                        <div class="dash-seller__name" id="sumName"></div>
-                        <div class="dash-seller__phone" id="sumPhone"></div>
-                        <span class="badge badge--green" style="margin-top:4px">Ativo</span>
+                        <div class="panel-seller-row__name" id="sumName"></div>
+                        <div class="panel-seller-row__phone" id="sumPhone"></div>
+                        <span class="panel-badge panel-badge--active" style="margin-top:4px">Ativo</span>
                         <span style="font-size:.6875rem;color:var(--color-gray-500);margin-left:8px" id="sumLimit"></span>
                     </div>
                 </div>
             </div>
 
-            <div class="card" style="margin-top:16px">
-                <div class="field field--prefix">
-                    <label class="field__label">Valor (R$)</label>
-                    <span class="field__prefix">R$</span>
-                    <input type="text" id="amount" name="amount_display" class="field__input"
-                           placeholder="0,00" inputmode="decimal" required value="{{ form_data.amount_display|default:'' }}">
+            <div class="panel-card" style="margin-top:16px">
+                <div class="panel-field">
+                    <label class="panel-field__label">Valor (R$)</label>
+                    <div class="panel-field__prefix">
+                        <span class="panel-field__prefix-text">R$</span>
+                        <input type="text" id="amount" name="amount_display" class="panel-field__input"
+                               placeholder="0,00" inputmode="decimal" required value="{{ form_data.amount_display|default:'' }}">
+                    </div>
                     <input type="hidden" id="installments" name="installments" value="{{ form_data.installments|default:1 }}">
                 </div>
 
-                <div class="field">
-                    <label class="field__label">Parcelamento</label>
-                    <div class="installments">
+                <div class="panel-field">
+                    <label class="panel-field__label">Parcelamento</label>
+                    <div class="panel-installments">
                         {% for i in "123"|make_list %}
-                        <button type="button" class="{% if form_data.installments|default:1 == forloop.counter %}selected{% endif %}" data-value="{{ forloop.counter }}">
+                        <button type="button" class="panel-installments__option{% if form_data.installments|default:1 == forloop.counter %} selected{% endif %}" data-value="{{ forloop.counter }}">
                             {{ forloop.counter }}x
                         </button>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="field">
-                    <label class="field__label">Cliente <span style="font-weight:400;color:var(--color-gray-400);font-size:.6875rem">(opcional)</span></label>
-                    <input type="text" name="customer_name" class="field__input" placeholder="Nome do cliente" maxlength="120" value="{{ form_data.customer_name|default:'' }}">
+                <div class="panel-field">
+                    <label class="panel-field__label">Cliente <span style="font-weight:400;color:var(--color-gray-400);font-size:.6875rem">(opcional)</span></label>
+                    <input type="text" name="customer_name" class="panel-field__input" placeholder="Nome do cliente" maxlength="120" value="{{ form_data.customer_name|default:'' }}">
                 </div>
 
-                <div class="field">
-                    <label class="field__label">Telefone do cliente <span style="font-weight:400;color:var(--color-gray-400);font-size:.6875rem">(opcional)</span></label>
-                    <input type="tel" name="customer_phone" class="field__input" placeholder="(31) 99999-9999" maxlength="20" value="{{ form_data.customer_phone|default:'' }}">
+                <div class="panel-field">
+                    <label class="panel-field__label">Telefone do cliente <span style="font-weight:400;color:var(--color-gray-400);font-size:.6875rem">(opcional)</span></label>
+                    <input type="tel" name="customer_phone" class="panel-field__input" placeholder="(31) 99999-9999" maxlength="20" value="{{ form_data.customer_phone|default:'' }}">
                 </div>
             </div>
 
-            <button type="submit" class="btn btn--primary btn--lg create-submit" id="submitBtn" style="width:100%">
-                <span class="btn__text">Criar link de pagamento</span>
-                <span class="btn__spinner"></span>
+            <button type="submit" class="panel-btn panel-btn--primary panel-btn--lg panel-create-submit" id="submitBtn" style="width:100%">
+                <span class="panel-btn__text">Criar link de pagamento</span>
+                <span class="panel-btn__spinner"></span>
             </button>
         </form>
     </div>
 
     <div>
-        <div class="card">
-            <h3 class="card__title" style="margin-bottom:8px">Resumo</h3>
-            <div class="summary" id="paymentSummary">
-                <p class="summary__empty">Selecione um vendedor e preencha o valor.</p>
+        <div class="panel-card">
+            <h3 class="panel-card__title" style="margin-bottom:8px">Resumo</h3>
+            <div class="panel-summary" id="paymentSummary">
+                <p class="panel-summary__empty">Selecione um vendedor e preencha o valor.</p>
             </div>
         </div>
     </div>
@@ -142,23 +145,23 @@ var sellerResults=document.getElementById('sellerResults');
 
 sellerSearch.addEventListener('focus',function(){sellerResults.classList.add('open');filterRes(this.value)});
 sellerSearch.addEventListener('input',function(){sellerResults.classList.add('open');filterRes(this.value)});
-document.addEventListener('click',function(e){if(!e.target.closest('.search-drop'))sellerResults.classList.remove('open')});
+document.addEventListener('click',function(e){if(!e.target.closest('.panel-seller-search'))sellerResults.classList.remove('open')});
 
 function filterRes(q){
     q=(q||'').toLowerCase();
-    sellerResults.querySelectorAll('.search-drop__item').forEach(function(i){
+    sellerResults.querySelectorAll('.panel-seller-search__item').forEach(function(i){
         var n=(i.getAttribute('data-name')||'').toLowerCase();
         var p=(i.getAttribute('data-phone')||'').toLowerCase();
         i.style.display=(!q||n.indexOf(q)!==-1||p.indexOf(q)!==-1)?'':'none';
     });
 }
 
-sellerResults.querySelectorAll('.search-drop__item').forEach(function(i){
+sellerResults.querySelectorAll('.panel-seller-search__item').forEach(function(i){
     i.addEventListener('click',function(){
         sellerId.value=this.getAttribute('data-id');
         sellerSearch.value=this.getAttribute('data-name')+' — '+this.getAttribute('data-phone');
         sellerResults.classList.remove('open');
-        sellerResults.querySelectorAll('.search-drop__item').forEach(function(j){j.classList.remove('selected')});
+        sellerResults.querySelectorAll('.panel-seller-search__item').forEach(function(j){j.classList.remove('selected')});
         this.classList.add('selected');
         var s=document.getElementById('sellerSummary');
         s.style.display='flex';
@@ -176,9 +179,9 @@ document.getElementById('amount').addEventListener('input',function(){
     this.value=v;updateSummary();
 });
 
-document.querySelectorAll('.installments button').forEach(function(b){
+document.querySelectorAll('.panel-installments button').forEach(function(b){
     b.addEventListener('click',function(){
-        document.querySelectorAll('.installments button').forEach(function(j){j.classList.remove('selected')});
+        document.querySelectorAll('.panel-installments button').forEach(function(j){j.classList.remove('selected')});
         this.classList.add('selected');
         document.getElementById('installments').value=this.getAttribute('data-value');
         updateSummary();
@@ -190,14 +193,14 @@ function updateSummary(){
     var id=sellerId.value;
     var amt=document.getElementById('amount').value;
     var inst=document.getElementById('installments').value;
-    if(!id||!amt){el.innerHTML='<p class="summary__empty">Selecione um vendedor e preencha o valor.</p>';return}
+    if(!id||!amt){el.innerHTML='<p class="panel-summary__empty">Selecione um vendedor e preencha o valor.</p>';return}
     var name='';
     for(var i=0;i<sellersData.length;i++){if(sellersData[i].id===id){name=sellersData[i].name;break}}
-    el.innerHTML='<div class="summary__row"><span>Vendedor</span><span>'+name+'</span></div><div class="summary__row"><span>Valor</span><span style="color:var(--green);font-weight:700">R$ '+amt+'</span></div><div class="summary__row"><span>Parcelas</span><span>'+inst+'x sem juros</span></div>';
+    el.innerHTML='<div class="panel-summary__row"><span>Vendedor</span><span>'+name+'</span></div><div class="panel-summary__row"><span>Valor</span><span style="color:var(--green);font-weight:700">R$ '+amt+'</span></div><div class="panel-summary__row"><span>Parcelas</span><span>'+inst+'x sem juros</span></div>';
 }
 
 document.getElementById('createLinkForm').addEventListener('submit',function(){
-    var b=document.getElementById('submitBtn');b.classList.add('btn--loading');b.disabled=true;
+    var b=document.getElementById('submitBtn');b.classList.add('panel-btn--loading');b.disabled=true;
 });
 
 {% if selected_seller_id %}
@@ -214,6 +217,6 @@ function copyUrl(u){
     if(navigator.clipboard){navigator.clipboard.writeText(u).then(function(){showT('Link copiado!')})}
     else{var t=document.createElement('textarea');t.value=u;t.style.position='fixed';t.style.left='-9999px';document.body.appendChild(t);t.select();try{document.execCommand('copy');showT('Link copiado!')}catch(e){}document.body.removeChild(t)}
 }
-function showT(m){var e=document.createElement('div');e.className='toast';e.textContent=m;document.body.appendChild(e);requestAnimationFrame(function(){e.classList.add('show')});setTimeout(function(){e.classList.remove('show');setTimeout(function(){e.remove()},200)},2000)}
+function showT(m){var e=document.createElement('div');e.className='panel-toast';e.textContent=m;document.body.appendChild(e);requestAnimationFrame(function(){e.classList.add('show')});setTimeout(function(){e.classList.remove('show');setTimeout(function(){e.remove()},200)},2000)}
 </script>
 {% endblock %}
