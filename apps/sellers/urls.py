@@ -1,7 +1,7 @@
 ﻿"""Seller URL patterns."""
 from django.urls import path
 
-from . import views
+from . import push_api, views
 
 app_name = "sellers"
 
@@ -21,6 +21,7 @@ urlpatterns = [
     path("sessao-invalida/", views.session_invalid, name="session_invalid"),
     # API
     path("api/v1/me/", views.seller_profile, name="profile"),
+    path("api/v1/me/push-subscriptions/", push_api.push_subscriptions, name="push_subscriptions"),
     path("api/v1/me/logout/", views.seller_logout, name="logout"),
     path("api/v1/me/logout-all/", views.seller_logout_all, name="logout-all"),
 ]

@@ -51,6 +51,8 @@
     };
 
     window.getCsrfToken = function () {
+        var input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input) return input.value;
         var cookie = document.cookie.split(';').find(function (c) { return c.trim().startsWith('csrftoken='); });
         return cookie ? cookie.split('=')[1] : '';
     };

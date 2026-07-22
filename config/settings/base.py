@@ -1,4 +1,4 @@
-"""Base settings for Vidalys Pay."""
+﻿"""Base settings for Vidalys Pay."""
 import os
 from pathlib import Path
 
@@ -145,6 +145,11 @@ API_KEY_PEPPER = env("API_KEY_PEPPER", default="")
 WORKER_POLL_SECONDS = env.int("WORKER_POLL_SECONDS")
 MAX_NOTIFICATION_ATTEMPTS = env.int("MAX_NOTIFICATION_ATTEMPTS")
 
+# Web Push (VAPID)
+WEBPUSH_VAPID_PUBLIC_KEY = env("WEBPUSH_VAPID_PUBLIC_KEY", default="")
+WEBPUSH_VAPID_PRIVATE_KEY = env("WEBPUSH_VAPID_PRIVATE_KEY", default="")
+WEBPUSH_VAPID_SUBJECT = env("WEBPUSH_VAPID_SUBJECT", default="mailto:contato@vidalys.com.br")
+
 # Pagar.me
 PAGARME_BASE_URL = env("PAGARME_BASE_URL", default="https://api.pagar.me/core/v5")
 PAGARME_CREDENTIAL = env("PAGARME_CREDENTIAL", default="")
@@ -160,7 +165,7 @@ EVOLUTION_API_URL = env("EVOLUTION_API_URL", default="")
 EVOLUTION_API_KEY = env("EVOLUTION_API_KEY", default="")
 EVOLUTION_INSTANCE = env("EVOLUTION_INSTANCE", default="")
 
-# Correios CWS — freight calculation
+# Correios CWS â€” freight calculation
 CORREIOS_ENABLED = env.bool("CORREIOS_ENABLED", default=False)
 CORREIOS_USUARIO = env("CORREIOS_USUARIO", default="")
 CORREIOS_CODIGO_ACESSO = env("CORREIOS_CODIGO_ACESSO", default="")

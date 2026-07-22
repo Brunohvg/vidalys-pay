@@ -1,4 +1,4 @@
-"""Outbox worker — processes pending notifications.
+﻿"""Outbox worker â€” processes pending notifications.
 
 Uses SELECT ... FOR UPDATE SKIP LOCKED for safe concurrent processing.
 """
@@ -16,7 +16,7 @@ BACKOFF_SECONDS = [0, 60, 300, 900, 3600]
 
 
 class Command(BaseCommand):
-    help = "Processa itens pendentes do outbox de notificações"
+    help = "Processa itens pendentes do outbox de notificaÃ§Ãµes"
 
     def handle(self, *args, **options):
         logger.info("Outbox worker iniciado")
@@ -67,7 +67,11 @@ class Command(BaseCommand):
         """Dispatch based on topic."""
         if item.topic == "whatsapp.send":
             return self._send_whatsapp(item)
-        logger.warning("Tópico desconhecido: %s", item.topic)
+        if item.topic == "webpush.send":
+            from apps.notifications.push_service import send_push_outbox_item
+
+            return send_push_outbox_item(item)
+        logger.warning("TÃ³pico desconhecido: %s", item.topic)
         return True
 
     def _send_whatsapp(self, item):
@@ -90,7 +94,7 @@ class Command(BaseCommand):
             message.status = WhatsAppMessageStatus.SENDING
             message.save(update_fields=["status"])
         except WhatsAppMessage.DoesNotExist:
-            logger.error("Mensagem %s não encontrada", message_id)
+            logger.error("Mensagem %s nÃ£o encontrada", message_id)
             return False
 
         # Send via Evolution
@@ -107,7 +111,7 @@ class Command(BaseCommand):
             message.attempt_count += 1
             message.save()
 
-            logger.info("WhatsApp enviado: %s → %s", message_id, provider_message_id)
+            logger.info("WhatsApp enviado: %s â†’ %s", message_id, provider_message_id)
             return True
 
         except EvolutionError as e:

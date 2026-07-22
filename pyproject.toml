@@ -1,4 +1,4 @@
-[project]
+﻿[project]
 name = "vidalys-pay"
 version = "0.1.0"
 description = "Links de pagamento internos para vendedores Vidalys"
@@ -11,6 +11,7 @@ dependencies = [
     "httpx>=0.27,<1.0",
     "psycopg[binary]>=3.1,<4.0",
     "whitenoise>=6.0,<7.0",
+    "pywebpush>=2.3,<3.0",
 ]
 
 [project.optional-dependencies]

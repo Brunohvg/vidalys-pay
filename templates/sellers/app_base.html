@@ -76,9 +76,11 @@
         </nav>
     </div>
 
+    <div class="app-security" hidden>{% csrf_token %}</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="{% static 'js/app.js' %}"></script>
     <script src="{% static 'js/pwa-install.js' %}"></script>
+    <script src="{% static 'js/push-notifications.js' %}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

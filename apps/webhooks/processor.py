@@ -1,9 +1,10 @@
-"""Webhook event processor — maps events to state transitions."""
+﻿"""Webhook event processor â€” maps events to state transitions."""
 import logging
 
 from django.db import transaction
 from django.utils import timezone
 
+from apps.notifications.push_service import queue_payment_status_push
 from apps.notifications.whatsapp_service import (
     queue_payment_approved,
     queue_payment_canceled,
@@ -16,7 +17,7 @@ from apps.payment_links.models import PaymentAttempt, PaymentLink, PaymentLinkSt
 
 from .event_mapping import FINAL_STATES, NO_REGRESS_STATES, get_event_config
 from .models import ProcessingStatus, WebhookEvent
-from .pagarme_payload import FailureReason, normalize_event
+from .pagarme_payload import normalize_event
 
 logger = logging.getLogger("apps.webhooks")
 
@@ -24,12 +25,12 @@ logger = logging.getLogger("apps.webhooks")
 def process_webhook_event(event: WebhookEvent) -> bool:
     """Process a webhook event.
 
-    Called via transaction.on_commit — the event is already persisted.
+    Called via transaction.on_commit â€” the event is already persisted.
     """
     config = get_event_config(event.event_type)
 
     if config is None:
-        logger.info("Evento desconhecido: %s — IGNORED", event.event_type)
+        logger.info("Evento desconhecido: %s â€” IGNORED", event.event_type)
         event.processing_status = ProcessingStatus.IGNORED
         event.processed_at = timezone.now()
         event.save(update_fields=["processing_status", "processed_at"])
@@ -48,7 +49,7 @@ def process_webhook_event(event: WebhookEvent) -> bool:
 
     if payment_link is None:
         logger.info(
-            "Link não encontrado para evento %s; order=%s charge=%s",
+            "Link nÃ£o encontrado para evento %s; order=%s charge=%s",
             event.event_type,
             normalized.order_code,
             normalized.charge_id,
@@ -63,7 +64,7 @@ def process_webhook_event(event: WebhookEvent) -> bool:
     target_status = config.get("link_status", "")
     if target_status and current_status in NO_REGRESS_STATES:
         logger.info(
-            "Transição bloqueada (estado final): link=%s %s -> %s evento=%s",
+            "TransiÃ§Ã£o bloqueada (estado final): link=%s %s -> %s evento=%s",
             payment_link.id, current_status, target_status, event.event_type,
         )
         event.processing_status = ProcessingStatus.IGNORED
@@ -75,7 +76,7 @@ def process_webhook_event(event: WebhookEvent) -> bool:
         with transaction.atomic():
             handler = ACTION_HANDLERS.get(action)
             if handler is None:
-                logger.warning("Ação desconhecida: %s", action)
+                logger.warning("AÃ§Ã£o desconhecida: %s", action)
                 event.processing_status = ProcessingStatus.IGNORED
                 event.processed_at = timezone.now()
                 event.save(update_fields=["processing_status", "processed_at"])
@@ -109,6 +110,9 @@ def _handle_mark_paid(event, payment_link, config, normalized):
     txn.on_commit(lambda: queue_payment_approved(
         seller=payment_link.seller, payment_link=payment_link,
     ))
+    txn.on_commit(lambda: queue_payment_status_push(
+        payment_link=payment_link, event_type="payment_paid",
+    ))
 
     logger.info("Link %s marcado como PAID, attempt=%s", payment_link.id, attempt.id)
 
@@ -123,6 +127,9 @@ def _handle_create_attempt(event, payment_link, config, normalized):
         txn.on_commit(lambda: queue_payment_failed(
             seller=payment_link.seller, payment_link=payment_link,
             failure_reason=reason, dedup_suffix=charge_id,
+        ))
+        txn.on_commit(lambda: queue_payment_status_push(
+            payment_link=payment_link, event_type="payment_failed", dedup_suffix=charge_id,
         ))
 
     if config.get("attempt_status") == "PAID":
@@ -143,6 +150,9 @@ def _handle_create_attempt(event, payment_link, config, normalized):
             seller=payment_link.seller, payment_link=payment_link,
             dedup_suffix=charge_id,
         ))
+        txn.on_commit(lambda: queue_payment_status_push(
+            payment_link=payment_link, event_type="payment_chargedback", dedup_suffix=charge_id,
+        ))
 
     logger.info("Attempt %s criado/atualizado para link %s", attempt.id, payment_link.id)
 
@@ -156,6 +166,9 @@ def _handle_mark_canceled(event, payment_link, config, normalized):
     from django.db import transaction as txn
     txn.on_commit(lambda: queue_payment_canceled(
         seller=payment_link.seller, payment_link=payment_link,
+    ))
+    txn.on_commit(lambda: queue_payment_status_push(
+        payment_link=payment_link, event_type="payment_canceled",
     ))
 
     logger.info("Link %s marcado como CANCELADO", payment_link.id)
@@ -174,6 +187,9 @@ def _handle_mark_refunded(event, payment_link, config, normalized):
         seller=payment_link.seller, payment_link=payment_link,
         dedup_suffix=charge_id,
     ))
+    txn.on_commit(lambda: queue_payment_status_push(
+        payment_link=payment_link, event_type="payment_refunded", dedup_suffix=charge_id,
+    ))
 
     logger.info("Link %s marcado como REFUNDED, attempt=%s", payment_link.id, attempt.id)
 
@@ -191,6 +207,9 @@ def _handle_mark_expired(event, payment_link, config, normalized):
     from django.db import transaction as txn
     txn.on_commit(lambda: queue_payment_expired(
         seller=payment_link.seller, payment_link=payment_link,
+    ))
+    txn.on_commit(lambda: queue_payment_status_push(
+        payment_link=payment_link, event_type="payment_expired",
     ))
 
     logger.info("Link %s marcado como EXPIRADO", payment_link.id)

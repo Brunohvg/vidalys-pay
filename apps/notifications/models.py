@@ -1,4 +1,4 @@
-"""Notification and outbox models."""
+﻿"""Notification and outbox models."""
 from django.db import models
 
 from apps.core.models import UUIDModel
@@ -55,18 +55,18 @@ class WhatsAppMessage(UUIDModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.template_key} → {self.recipient_type}:{self.recipient_phone}"
+        return f"{self.template_key} â†’ {self.recipient_type}:{self.recipient_phone}"
 
 
 class OutboxStatus(models.TextChoices):
     PENDING = "PENDING", "Pendente"
     PROCESSING = "PROCESSING", "Processando"
-    DONE = "DONE", "Concluído"
+    DONE = "DONE", "ConcluÃ­do"
     DEAD = "DEAD", "Permanente"
 
 
 class NotificationOutbox(UUIDModel):
-    """Outbox para envio confiável de mensagens."""
+    """Outbox para envio confiÃ¡vel de mensagens."""
 
     topic = models.CharField(max_length=80)
     aggregate_type = models.CharField(max_length=80)
@@ -88,9 +88,34 @@ class NotificationOutbox(UUIDModel):
     processed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        verbose_name = "Outbox de Notificação"
-        verbose_name_plural = "Outbox de Notificações"
+        verbose_name = "Outbox de NotificaÃ§Ã£o"
+        verbose_name_plural = "Outbox de NotificaÃ§Ãµes"
         ordering = ["available_at"]
 
     def __str__(self):
-        return f"{self.topic} — {self.get_status_display()}"
+        return f"{self.topic} â€” {self.get_status_display()}"
+class PushSubscription(UUIDModel):
+    """Web Push subscription for one seller device/browser profile."""
+
+    seller = models.ForeignKey(
+        "sellers.Seller",
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    failure_count = models.PositiveSmallIntegerField(default=0)
+    last_delivery_key = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Assinatura Push"
+        verbose_name_plural = "Assinaturas Push"
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"Push de {self.seller.name}"

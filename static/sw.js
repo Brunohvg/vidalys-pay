@@ -1,5 +1,5 @@
 ﻿/* Vidalys Pay â€” Service Worker v4 */
-const CACHE_NAME = 'vidalys-pay-v5';
+const CACHE_NAME = 'vidalys-pay-v6';
 const STATIC_ASSETS = [
   '/static/css/tokens.css',
   '/static/css/app.css',
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   '/static/css/pwa-install.css',
   '/static/js/app.js',
   '/static/js/pwa-install.js',
+  '/static/js/push-notifications.js',
   '/static/brand/logo-symbol.svg',
   '/static/brand/logo-symbol-white.svg',
   '/static/pwa/app-icon-192.png',
@@ -64,6 +65,41 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       });
+    })
+  );
+});
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (_) {}
+  const title = payload.title || 'Vidalys Pay';
+  const options = {
+    body: payload.body || 'Há uma atualização no seu pagamento.',
+    icon: payload.icon || '/static/pwa/app-icon-192.png',
+    badge: payload.badge || '/static/pwa/app-icon-192.png',
+    tag: payload.tag || 'vidalys-payment-update',
+    renotify: true,
+    silent: false,
+    vibrate: [180, 80, 180],
+    data: {url: payload.url || '/app/historico/', eventType: payload.event_type || ''},
+  };
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    self.registration.setAppBadge ? self.registration.setAppBadge(1) : Promise.resolve(),
+  ]));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/app/historico/', self.location.origin).href;
+  event.waitUntil(
+    clients.matchAll({type: 'window', includeUncontrolled: true}).then((windows) => {
+      for (const client of windows) {
+        if ('focus' in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return clients.openWindow ? clients.openWindow(target) : undefined;
     })
   );
 });
