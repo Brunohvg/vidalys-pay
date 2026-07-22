@@ -1,5 +1,8 @@
-{% extends "sellers/app_base.html" %}
+﻿{% extends "sellers/app_base.html" %}
 {% load formatting %}
+{% block title %}Histórico — Vidalys Pay{% endblock %}
+{% block page_title %}Histórico de links{% endblock %}
+{% block page_description %}<p>Acompanhe cobranças e compartilhe links novamente.</p>{% endblock %}
 
 {% block content %}
 <div class="filters" role="tablist" aria-label="Filtrar por status">
@@ -45,13 +48,13 @@
             {% if link.payment_url %}
             <div class="link-card__actions">
                 <button class="link-card__action" onclick="copyLink('{{ link.payment_url }}')" aria-label="Copiar link">
-                    📋 Copiar
+                    Copiar
                 </button>
                 <button class="link-card__action" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')" aria-label="Compartilhar link">
-                    📤 Compartilhar
+                    Compartilhar
                 </button>
                 <button class="link-card__action" onclick="resendLink('{{ link.id }}')" aria-label="Reenviar link">
-                    🔄 Reenviar
+                    Reenviar
                 </button>
             </div>
             {% endif %}
@@ -60,7 +63,7 @@
     </div>
 {% else %}
     <div class="empty-state">
-        <div class="empty-state__icon">📄</div>
+        <div class="empty-state__icon">⌁</div>
         <p class="empty-state__text">
             {% if status_filter %}
                 Nenhum link encontrado com este filtro.

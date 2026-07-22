@@ -1,7 +1,10 @@
-{% extends "sellers/app_base.html" %}
+﻿{% extends "sellers/app_base.html" %}
+{% block title %}Criar link — Vidalys Pay{% endblock %}
+{% block page_title %}Novo link de pagamento{% endblock %}
+{% block page_description %}<p>Preencha os dados e gere uma cobrança em segundos.</p>{% endblock %}
 
 {% block content %}
-<h2 style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--color-navy-900);">Novo link de pagamento</h2>
+
 
 <div class="card">
     <form id="createForm" method="post" action="/api/v1/payment-links/">

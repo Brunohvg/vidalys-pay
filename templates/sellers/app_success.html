@@ -1,5 +1,8 @@
-{% extends "sellers/app_base.html" %}
+﻿{% extends "sellers/app_base.html" %}
 {% load formatting %}
+{% block title %}Link criado — Vidalys Pay{% endblock %}
+{% block page_title %}Cobrança criada{% endblock %}
+{% block page_description %}<p>Compartilhe o link ou acompanhe o envio pelo WhatsApp.</p>{% endblock %}
 
 {% block content %}
 {% if link %}
@@ -27,13 +30,13 @@
 
     <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-6); max-width: 320px; margin-inline: auto;">
         <button class="btn-primary" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')">
-            📤 Compartilhar link
+            Compartilhar link
         </button>
         <button class="btn-secondary" onclick="copyLink('{{ link.payment_url }}')">
-            📋 Copiar link
+            Copiar link
         </button>
         <button class="btn-whatsapp" onclick="resendLink('{{ link.id }}')">
-            🔄 Reenviar via WhatsApp
+            Reenviar via WhatsApp
         </button>
     </div>
 
@@ -45,7 +48,7 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <div class="empty-state__icon">❓</div>
+    <div class="empty-state__icon">?</div>
     <p class="empty-state__text">Link não encontrado.</p>
     <a href="/app/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-6);">Criar novo link</a>
 </div>

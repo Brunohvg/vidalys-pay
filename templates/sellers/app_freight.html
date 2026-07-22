@@ -1,8 +1,12 @@
-{% extends "sellers/app_base.html" %}
+﻿{% extends "sellers/app_base.html" %}
 {% load static %}
 {% load formatting %}
 
 {% block greeting %}{% endblock %}
+
+{% block title %}Calcular frete — Vidalys Pay{% endblock %}
+{% block page_title %}Calcular frete{% endblock %}
+{% block page_description %}<p>Consulte valores e prazos dos Correios.</p>{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/freight.css' %}">
@@ -191,7 +195,7 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ── Elements ──────────────────────────────────────────────────────────
+    // —
     var stepCep = document.getElementById('stepCep');
     var stepAddress = document.getElementById('stepAddress');
     var stepPackage = document.getElementById('stepPackage');
@@ -223,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var progressSteps = document.getElementById('progressSteps');
     var stepBtns = progressSteps.querySelectorAll('.freight-progress__step-btn');
 
-    // ── State ─────────────────────────────────────────────────────────────
+    // —
     var freightState = {
         currentStep: 'destination',
         address: null,
@@ -235,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var debounceTimer = null;
     var errorRetryAction = null;
 
-    // ── CSRF ──────────────────────────────────────────────────────────────
+    // —
     function getCsrfToken() {
         var input = document.querySelector('[name=csrfmiddlewaretoken]');
         if (input && input.value) return input.value;
@@ -256,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return headers;
     }
 
-    // ── Navigation ────────────────────────────────────────────────────────
+    // —
     function enableStep(name, enabled) {
         var btn = progressSteps.querySelector('[data-step="' + name + '"]');
         if (!btn) return;
@@ -338,13 +342,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ── Progress bar update ───────────────────────────────────────────────
+    // —
     function updateProgress(stepNum) {
         var map = { 1: 'destination', 2: 'package', 3: 'results' };
         updateProgressBar(map[stepNum] || 'destination');
     }
 
-    // ── CEP Input ─────────────────────────────────────────────────────────
+    // —
     zipInput.addEventListener('input', function() {
         var val = this.value.replace(/\D/g, '');
         if (val.length > 8) val = val.slice(0, 8);
@@ -466,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
         zipInput.focus();
     });
 
-    // ── Package presets ───────────────────────────────────────────────────
+    // —
     function getActivePresetData() {
         var el = presetGroup.querySelector('.freight-package__item.selected');
         if (!el) return null;
@@ -524,7 +528,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ── Declared value ────────────────────────────────────────────────────
+    // —
     declaredToggle.addEventListener('click', function() {
         var expanded = declaredToggle.getAttribute('aria-expanded') === 'true';
         if (expanded) {
@@ -550,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function() {
         invalidateQuote();
     });
 
-    // ── Quote fingerprint ─────────────────────────────────────────────────
+    // —
     function getPackageParams() {
         var preset = getActivePresetData();
         var w = preset && preset.dataset.weight !== '0'
@@ -584,7 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ── Calculate ─────────────────────────────────────────────────────────
+    // —
     calculateBtn.addEventListener('click', calculateFreight);
 
     async function calculateFreight() {
@@ -661,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ── Results ───────────────────────────────────────────────────────────
+    // —
     function renderResults(data) {
         var dest = data.destination;
         var destParts = [];
@@ -764,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function() {
         goToStep('package');
     });
 
-    // ── Error ─────────────────────────────────────────────────────────────
+    // —
     function showError(msg, retryFn) {
         errorMessage.textContent = msg;
         errorRetryAction = retryFn || null;
@@ -777,7 +781,7 @@ document.addEventListener('DOMContentLoaded', function() {
         errorRetryAction = null;
     }
 
-    // ── Initial ───────────────────────────────────────────────────────────
+    // —
     updateProgress(1);
 });
 </script>

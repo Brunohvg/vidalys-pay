@@ -1,59 +1,83 @@
-/* Vidalys Pay — App JavaScript v2 */
+﻿/* Vidalys Pay — Seller App Runtime v4 */
+(function () {
+    'use strict';
 
-// Toast notification with type support
-function showToast(message, type = 'default', duration = 3000) {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
+    var splash = document.getElementById('appSplash');
+    var firstOpen = false;
+    try {
+        firstOpen = !sessionStorage.getItem('vidalys-app-ready');
+        if (firstOpen) sessionStorage.setItem('vidalys-app-ready', '1');
+    } catch (_) {}
 
-    // Remove previous classes
-    toast.className = 'toast';
-
-    // Add type class
-    if (type === 'success') toast.classList.add('toast--success');
-    else if (type === 'error') toast.classList.add('toast--error');
-    else if (type === 'warning') toast.classList.add('toast--warning');
-
-    toast.textContent = message;
-    toast.classList.add('show');
-
-    setTimeout(() => toast.classList.remove('show'), duration);
-}
-
-// Offline detection
-function updateOnlineStatus() {
-    const banner = document.getElementById('offlineBanner');
-    const status = document.getElementById('connectionStatus');
-    if (navigator.onLine) {
-        document.body.classList.remove('offline');
-        if (banner) banner.style.display = 'none';
-        if (status) {
-            status.textContent = 'online';
-            status.style.color = '';
-        }
-    } else {
-        document.body.classList.add('offline');
-        if (banner) banner.style.display = 'block';
-        if (status) {
-            status.textContent = 'offline';
-            status.style.color = 'var(--color-warning)';
+    function revealApp() {
+        document.body.classList.add('app-ready');
+        if (splash) {
+            splash.classList.add('app-splash--hide');
+            window.setTimeout(function () { splash.remove(); }, 220);
         }
     }
-}
 
-window.addEventListener('online', updateOnlineStatus);
-window.addEventListener('offline', updateOnlineStatus);
-document.addEventListener('DOMContentLoaded', updateOnlineStatus);
+    if (splash && firstOpen) {
+        splash.classList.add('app-splash--visible');
+        window.addEventListener('load', function () {
+            window.setTimeout(revealApp, 260);
+        }, { once: true });
+        window.setTimeout(revealApp, 900);
+    } else {
+        if (splash) splash.remove();
+        requestAnimationFrame(function () { document.body.classList.add('app-ready'); });
+    }
 
-// CSRF token helper
-function getCsrfToken() {
-    const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
-    return cookie ? cookie.split('=')[1] : '';
-}
+    window.showToast = function (message, type, duration) {
+        var toast = document.getElementById('toast');
+        if (!toast) return;
+        toast.className = 'toast';
+        if (type) toast.classList.add('toast--' + type);
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(window.__vidalysToastTimer);
+        window.__vidalysToastTimer = setTimeout(function () { toast.classList.remove('show'); }, duration || 2400);
+    };
 
-// Format currency
-function formatCurrency(cents) {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-    }).format(cents / 100);
-}
+    window.updateOnlineStatus = function () {
+        var online = navigator.onLine;
+        var banner = document.getElementById('offlineBanner');
+        var status = document.getElementById('connectionStatus');
+        document.body.classList.toggle('offline', !online);
+        if (banner) banner.hidden = online;
+        if (status) status.textContent = online ? 'Online' : 'Offline';
+    };
+
+    window.getCsrfToken = function () {
+        var cookie = document.cookie.split(';').find(function (c) { return c.trim().startsWith('csrftoken='); });
+        return cookie ? cookie.split('=')[1] : '';
+    };
+
+    window.formatCurrency = function (cents) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+    };
+
+    function addPressFeedback() {
+        document.addEventListener('pointerdown', function (event) {
+            var target = event.target.closest('button, .btn-primary, .btn-secondary, .btn-whatsapp, .link-card__action, .nav a');
+            if (target && !target.disabled) target.classList.add('is-pressed');
+        }, { passive: true });
+        ['pointerup', 'pointercancel'].forEach(function (name) {
+            document.addEventListener(name, function () {
+                document.querySelectorAll('.is-pressed').forEach(function (el) { el.classList.remove('is-pressed'); });
+            }, { passive: true });
+        });
+    }
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js', { scope: '/app/' }).catch(function () {});
+        }, { once: true });
+    }
+    window.addEventListener('online', window.updateOnlineStatus);
+    window.addEventListener('offline', window.updateOnlineStatus);
+    document.addEventListener('DOMContentLoaded', function () {
+        window.updateOnlineStatus();
+        addPressFeedback();
+    });
+})();

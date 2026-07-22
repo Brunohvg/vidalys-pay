@@ -1,4 +1,4 @@
-/* Vidalys Pay — PWA Install Controller v1 */
+﻿/* Vidalys Pay — PWA Install Controller v1 */
 
 (function () {
   var deferredInstallPrompt = null;

@@ -1,4 +1,4 @@
-"""Seller URL patterns."""
+﻿"""Seller URL patterns."""
 from django.urls import path
 
 from . import views
@@ -6,6 +6,7 @@ from . import views
 app_name = "sellers"
 
 urlpatterns = [
+    path("sw.js", views.service_worker, name="service_worker"),
     path("", views.index, name="index"),
     # Activation
     path("acesso/<str:token>/", views.activate_invitation, name="activate"),

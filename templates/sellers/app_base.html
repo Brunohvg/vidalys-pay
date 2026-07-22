@@ -1,24 +1,20 @@
-{% load static %}<!DOCTYPE html>
+﻿{% load static %}<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#071B4A">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Vidalys Pay">
     <meta name="description" content="Crie e compartilhe links de pagamento com segurança">
-    <title>{{ app_name }}</title>
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
     <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicons/favicon-16.png' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicons/favicon-32.png' %}">
-    <link rel="icon" type="image/png" sizes="48x48" href="{% static 'favicons/favicon-48.png' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicons/apple-touch-icon-180.png' %}">
     <meta property="og:title" content="Vidalys Pay">
     <meta property="og:description" content="Crie links de pagamento e acompanhe recebimentos com praticidade.">
     <meta property="og:image" content="{% static 'social/og-image-1200x630.png' %}">
-    <meta name="twitter:card" content="summary_large_image">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -26,43 +22,61 @@
     <link rel="stylesheet" href="{% static 'css/pwa-install.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
-    <div class="offline-banner" id="offlineBanner">Sem conexão</div>
+<body class="seller-app" data-active-tab="{{ active_tab|default:'' }}">
+    <div class="app-splash" id="appSplash" aria-hidden="true">
+        <div class="app-splash__mark"><img src="{% static 'brand/logo-symbol-white.svg' %}" alt="" width="48" height="48"></div>
+        <div class="app-splash__name">Vidalys <span>Pay</span></div>
+        <div class="app-splash__progress"><i></i></div>
+    </div>
+    <div class="offline-banner" id="offlineBanner" role="status">Sem conexão. Algumas ações podem ficar indisponíveis.</div>
 
-    <header class="header">
-        <a href="/app/" class="header__logo">
-            <img src="{% static 'brand/logo-symbol.svg' %}" alt="Vidalys Pay" class="header__logo-icon" width="36" height="36">
-            <span class="header__logo-text">Vidalys <span>Pay</span></span>
-        </a>
-        <span class="header__status" id="connectionStatus">online</span>
-    </header>
+    <div class="app-shell">
+        <header class="header">
+            <div class="header__inner">
+                <a href="/app/" class="header__logo" aria-label="Vidalys Pay — início">
+                    <img src="{% static 'brand/logo-symbol-white.svg' %}" alt="" class="header__logo-icon" width="34" height="34">
+                    <span class="header__logo-text">Vidalys <span>Pay</span></span>
+                </a>
+                <div class="header__user">
+                    <span class="header__status" id="connectionStatus">Online</span>
+                    <span class="header__avatar" aria-hidden="true">{{ seller.name|slice:":1"|upper }}</span>
+                </div>
+            </div>
+        </header>
 
-    <main class="content">
-        {% block greeting %}<p class="greeting">Olá, {{ seller.name }}</p>{% endblock %}
-        {% block content %}{% endblock %}
-    </main>
+        <main class="content" id="appContent">
+            <div class="app-page-heading">
+                <div>
+                    {% block greeting %}<span class="app-page-heading__eyebrow">Olá, {{ seller.name }}</span>{% endblock %}
+                    <h1>{% block page_title %}Seu aplicativo{% endblock %}</h1>
+                    {% block page_description %}{% endblock %}
+                </div>
+                {% block page_action %}{% endblock %}
+            </div>
+            <div class="app-page" data-page="{{ active_tab|default:'page' }}">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
 
-    <nav class="nav" aria-label="Navegação principal">
-        <a href="/app/" class="{% if active_tab == 'new' %}active{% endif %}" aria-label="Criar link">
-            <img src="{% static 'ui-icons/link.svg' %}" alt="" width="20" height="20">
-            Criar link
-        </a>
-        <a href="/app/historico/" class="{% if active_tab == 'history' %}active{% endif %}" aria-label="Histórico">
-            <img src="{% static 'ui-icons/calendar.svg' %}" alt="" width="20" height="20">
-            Histórico
-        </a>
-        <a href="/app/frete/" class="{% if active_tab == 'freight' %}active{% endif %}" aria-label="Calcular frete">
-            <img src="{% static 'ui-icons/truck.svg' %}" alt="" width="20" height="20">
-            Calcular frete
-        </a>
-        <a href="/app/perfil/" class="{% if active_tab == 'profile' %}active{% endif %}" aria-label="Perfil">
-            <img src="{% static 'ui-icons/user.svg' %}" alt="" width="20" height="20">
-            Perfil
-        </a>
-    </nav>
+        <nav class="nav" aria-label="Navegação principal">
+            <div class="nav__inner">
+                <a href="/app/" class="{% if active_tab == 'new' %}active{% endif %}" {% if active_tab == 'new' %}aria-current="page"{% endif %}>
+                    <span class="nav__icon"><img src="{% static 'ui-icons/link.svg' %}" alt="" width="20" height="20"></span><span>Criar</span>
+                </a>
+                <a href="/app/historico/" class="{% if active_tab == 'history' %}active{% endif %}" {% if active_tab == 'history' %}aria-current="page"{% endif %}>
+                    <span class="nav__icon"><img src="{% static 'ui-icons/calendar.svg' %}" alt="" width="20" height="20"></span><span>Histórico</span>
+                </a>
+                <a href="/app/frete/" class="{% if active_tab == 'freight' %}active{% endif %}" {% if active_tab == 'freight' %}aria-current="page"{% endif %}>
+                    <span class="nav__icon"><img src="{% static 'ui-icons/truck.svg' %}" alt="" width="20" height="20"></span><span>Frete</span>
+                </a>
+                <a href="/app/perfil/" class="{% if active_tab == 'profile' %}active{% endif %}" {% if active_tab == 'profile' %}aria-current="page"{% endif %}>
+                    <span class="nav__icon"><img src="{% static 'ui-icons/user.svg' %}" alt="" width="20" height="20"></span><span>Perfil</span>
+                </a>
+            </div>
+        </nav>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
     <script src="{% static 'js/app.js' %}"></script>
     <script src="{% static 'js/pwa-install.js' %}"></script>
     {% block scripts %}{% endblock %}

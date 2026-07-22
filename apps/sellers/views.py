@@ -1,12 +1,9 @@
-"""Seller views — invitation activation, app pages, profile."""
+"""Seller views â€” invitation activation, app pages, profile."""
 import logging
-from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.sessions.backends.db import SessionStore
-from django.contrib.sessions.models import Session
-from django.db import transaction
-from django.http import JsonResponse
+from django.contrib.staticfiles import finders
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -15,14 +12,27 @@ from .decorators import seller_login_required
 from .models import SellerSession
 from .services import (
     activate_session,
-    generate_invitation,
-    get_seller_from_session,
     revoke_all_sessions,
     validate_invitation,
 )
 
 logger = logging.getLogger("apps.sellers")
 
+
+
+@require_GET
+def service_worker(request):
+    """Serve the PWA worker at the site root so it can control /app/."""
+    worker_path = finders.find("sw.js")
+    if not worker_path:
+        raise Http404("Service worker not found")
+    response = FileResponse(
+        open(worker_path, "rb"),  # noqa: SIM115
+        content_type="application/javascript",
+    )
+    response["Service-Worker-Allowed"] = "/app/"
+    response["Cache-Control"] = "no-cache"
+    return response
 
 # --- Activation ---
 

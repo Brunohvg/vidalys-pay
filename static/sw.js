@@ -1,11 +1,16 @@
-/* Vidalys Pay — Service Worker v3 */
-const CACHE_NAME = 'vidalys-pay-v3';
+﻿/* Vidalys Pay â€” Service Worker v4 */
+const CACHE_NAME = 'vidalys-pay-v4';
 const STATIC_ASSETS = [
   '/static/css/tokens.css',
   '/static/css/app.css',
+  '/static/css/freight.css',
   '/static/css/pwa-install.css',
   '/static/js/app.js',
   '/static/js/pwa-install.js',
+  '/static/brand/logo-symbol.svg',
+  '/static/brand/logo-symbol-white.svg',
+  '/static/pwa/app-icon-192.png',
+  '/static/favicons/favicon-32.png',
   '/static/offline.html',
 ];
 
