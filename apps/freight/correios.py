@@ -1,10 +1,11 @@
 """Correios CWS (Web Services) client.
 
-Authentication: obtains and caches a Bearer token.
-Pricing/Deadline: queries PAC and SEDEX.
+Authentication: HTTP Basic Auth + Bearer token.
+Pricing/Deadline: batch POST queries.
 """
 import logging
-import time
+from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import httpx
@@ -23,6 +24,29 @@ TOKEN_CACHE_KEY = "correios:cws:token"
 CORREIOS_API_BASE = "https://api.correios.com.br"
 
 
+def calculate_token_ttl(expira_em: Any) -> int:
+    """Calculate token TTL from expiraEm field.
+
+    expira_em can be:
+    - int: seconds until expiry
+    - str: ISO datetime string
+    """
+    if isinstance(expira_em, int):
+        return expira_em
+
+    if isinstance(expira_em, str):
+        try:
+            expires_at = datetime.fromisoformat(
+                expira_em.replace("Z", "+00:00")
+            )
+            now = datetime.now(timezone.utc)
+            return max(int((expires_at - now).total_seconds()), 60)
+        except (ValueError, TypeError):
+            return 300
+
+    return 300
+
+
 class CorreiosAuthClient:
     def __init__(self):
         self._config = get_correios_config()
@@ -32,18 +56,6 @@ class CorreiosAuthClient:
         if self._config.cartao_postagem:
             return f"{CORREIOS_API_BASE}/token/v1/autentica/cartaopostagem"
         return f"{CORREIOS_API_BASE}/token/v1/autentica"
-
-    @property
-    def _auth_payload(self) -> dict:
-        payload: dict[str, str] = {
-            "numero": self._config.usuario,
-        }
-        if self._config.cartao_postagem:
-            payload["codigoAcesso"] = self._config.codigo_acesso
-            payload["cartaoPostagem"] = self._config.cartao_postagem
-        else:
-            payload["codigoAcesso"] = self._config.codigo_acesso
-        return payload
 
     def get_token(self) -> str:
         cached = cache.get(TOKEN_CACHE_KEY)
@@ -58,15 +70,32 @@ class CorreiosAuthClient:
         cache.delete(TOKEN_CACHE_KEY)
 
     def _authenticate(self) -> CorreiosToken:
+        """Authenticate using HTTP Basic Auth.
+
+        With cartao_postagem: POST body = {"numero": "<cartao>"}
+        Without cartao_postagem: POST body = None
+        """
+        auth = httpx.BasicAuth(
+            self._config.usuario,
+            self._config.codigo_acesso,
+        )
+
+        body = None
+        if self._config.cartao_postagem:
+            body = {"numero": self._config.cartao_postagem}
+
+        timeout = httpx.Timeout(
+            connect=self._config.connect_timeout,
+            read=self._config.read_timeout,
+        )
+
         try:
             response = httpx.post(
                 self._token_url,
-                json=self._auth_payload,
+                auth=auth,
+                json=body,
                 headers={"Accept": "application/json"},
-                timeout=httpx.Timeout(
-                    connect=self._config.connect_timeout,
-                    read=self._config.read_timeout,
-                ),
+                timeout=timeout,
             )
             response.raise_for_status()
             data = response.json()
@@ -77,37 +106,57 @@ class CorreiosAuthClient:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (401, 403):
                 raise FreightAuthenticationError(
-                    "Nao foi possivel autenticar nos Correios."
+                    "Não foi possível autenticar nos Correios. Verifique a configuração."
                 ) from exc
             raise FreightProviderUnavailable(
-                "Os Correios estao indisponiveis. Tente novamente."
+                "Os Correios estão indisponíveis. Tente novamente."
             ) from exc
         except httpx.RequestError as exc:
             raise FreightProviderUnavailable(
-                "Nao foi possivel conectar aos Correios."
+                "Não foi possível conectar aos Correios."
             ) from exc
 
         token = data.get("token") or data.get("access_token") or ""
-        expires_in = data.get("expiraEm") or data.get("expires_in") or 3600
+        expira_em = data.get("expiraEm") or data.get("expires_in") or 3600
 
         if not token:
             raise FreightAuthenticationError(
-                "Token nao encontrado na resposta dos Correios."
+                "Token não encontrado na resposta dos Correios."
             )
+
+        expires_in = calculate_token_ttl(expira_em)
 
         return CorreiosToken(
             access_token=token,
-            expires_in=int(expires_in),
+            expires_in=expires_in,
             token_type=data.get("tipo", "Bearer"),
         )
 
     def _cache_token(self, token_data: CorreiosToken) -> None:
-        ttl = max(1, token_data.expires_in - self._config.token_cache_margin_seconds)
+        ttl = max(60, token_data.expires_in - self._config.token_cache_margin_seconds)
         cache.set(
             TOKEN_CACHE_KEY,
             {"access_token": token_data.access_token},
             timeout=ttl,
         )
+
+
+def _parse_price(value: Any) -> int:
+    """Parse price string to cents using Decimal for precision."""
+    if isinstance(value, Decimal):
+        return int(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100)
+
+    if isinstance(value, (int, float)):
+        return int(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100)
+
+    if isinstance(value, str):
+        normalized = value.strip().replace(",", ".")
+        try:
+            return int(Decimal(normalized).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100)
+        except Exception:
+            return 0
+
+    return 0
 
 
 class CorreiosFreightClient:
@@ -121,31 +170,84 @@ class CorreiosFreightClient:
         self._auth = CorreiosAuthClient()
 
     def calculate(self, package: PackageData) -> list[FreightOption]:
+        """Calculate freight using batch POST endpoints for price and deadline."""
         services = [
             self._config.pac_product_code,
             self._config.sedex_product_code,
         ]
 
         token = self._auth.get_token()
-        options: list[FreightOption] = []
 
+        try:
+            prices = self._batch_price(token, services, package)
+        except FreightAuthenticationError:
+            self._auth.invalidate_token()
+            token = self._auth.get_token()
+            prices = self._batch_price(token, services, package)
+
+        try:
+            deadlines = self._batch_deadline(token, services, package)
+        except (FreightProviderUnavailable, FreightAuthenticationError):
+            deadlines = {}
+
+        options = []
         for service_code in services:
-            option = self._calculate_for_service(
-                token=token,
+            service_name = self.SERVICE_NAMES.get(service_code, service_code)
+            price_cents = prices.get(service_code, 0)
+            delivery_days = deadlines.get(service_code)
+
+            options.append(FreightOption(
+                provider="correios",
                 service_code=service_code,
-                package=package,
-            )
-            options.append(option)
+                service_name=service_name,
+                price_cents=price_cents,
+                delivery_days=delivery_days,
+                official=price_cents > 0,
+                error="Preço indisponível" if price_cents == 0 else None,
+            ))
 
         return options
 
-    def _calculate_for_service(
+    def _batch_price(
         self,
         token: str,
-        service_code: str,
+        services: list[str],
         package: PackageData,
-    ) -> FreightOption:
-        service_name = self.SERVICE_NAMES.get(service_code, service_code)
+    ) -> dict[str, int]:
+        """Query prices for all services in a single POST."""
+        url = f"{CORREIOS_API_BASE}/preco/v1/nacional"
+
+        parametros = []
+        for i, service_code in enumerate(services):
+            param: dict[str, Any] = {
+                "coProduto": service_code,
+                "nuRequisicao": f"preco-{service_code}",
+                "cepOrigem": self._config.cep_origem,
+                "cepDestino": package.destination_zip_code,
+                "psObjeto": str(package.weight_grams),
+                "tpObjeto": "2",
+                "comprimento": str(package.length_cm),
+                "largura": str(package.width_cm),
+                "altura": str(package.height_cm),
+            }
+
+            if self._config.contrato:
+                param["nuContrato"] = self._config.contrato
+            if self._config.dr:
+                param["nuDR"] = self._config.dr
+
+            if package.declared_value_cents > 0:
+                param["vlDeclarado"] = str(
+                    Decimal(str(package.declared_value_cents))
+                    / Decimal("100")
+                )
+
+            parametros.append(param)
+
+        payload = {
+            "idLote": "freight-batch",
+            "parametrosProduto": parametros,
+        }
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -153,72 +255,9 @@ class CorreiosFreightClient:
         }
 
         try:
-            price = self._get_price(headers, service_code, package)
-        except FreightProviderUnavailable:
-            return FreightOption(
-                provider="correios",
-                service_code=service_code,
-                service_name=service_name,
-                price_cents=0,
-                delivery_days=None,
-                official=False,
-                error="Preco indisponivel",
-            )
-        except FreightAuthenticationError:
-            self._auth.invalidate_token()
-            token = self._auth.get_token()
-            headers["Authorization"] = f"Bearer {token}"
-            try:
-                price = self._get_price(headers, service_code, package)
-            except (FreightProviderUnavailable, FreightAuthenticationError):
-                return FreightOption(
-                    provider="correios",
-                    service_code=service_code,
-                    service_name=service_name,
-                    price_cents=0,
-                    delivery_days=None,
-                    official=False,
-                    error="Preco indisponivel",
-                )
-
-        try:
-            deadline = self._get_deadline(headers, service_code, package)
-        except (FreightProviderUnavailable, FreightAuthenticationError):
-            deadline = None
-
-        return FreightOption(
-            provider="correios",
-            service_code=service_code,
-            service_name=service_name,
-            price_cents=price,
-            delivery_days=deadline,
-            official=True,
-        )
-
-    def _get_price(
-        self,
-        headers: dict,
-        service_code: str,
-        package: PackageData,
-    ) -> int:
-        url = (
-            f"{CORREIOS_API_BASE}/preco/v1/nacional/{service_code}"
-            f"?cepOrigem={self._config.cep_origem}"
-            f"&cepDestino={package.destination_zip_code}"
-            f"&psObjeto={package.weight_grams}"
-            f"&tpObjeto=2"
-            f"&comprimento={package.length_cm}"
-            f"&largura={package.width_cm}"
-            f"&altura={package.height_cm}"
-            f"&servicosAdicionais="
-        )
-
-        if package.declared_value_cents > 0:
-            url += f"&vlDeclarado={package.declared_value_cents / 100:.2f}"
-
-        try:
-            response = httpx.get(
+            response = httpx.post(
                 url,
+                json=payload,
                 headers=headers,
                 timeout=httpx.Timeout(
                     connect=self._config.connect_timeout,
@@ -235,38 +274,72 @@ class CorreiosFreightClient:
             if exc.response.status_code in (401, 403):
                 raise FreightAuthenticationError() from exc
             raise FreightProviderUnavailable(
-                "Os Correios estao indisponiveis. Tente novamente."
+                "Os Correios estão indisponíveis. Tente novamente."
             ) from exc
         except httpx.RequestError as exc:
             raise FreightProviderUnavailable(
-                "Nao foi possivel conectar aos Correios."
+                "Não foi possível conectar aos Correios."
             ) from exc
 
-        price_str = (
-            data.get("pcFinal")
-            or data.get("precoFinal")
-            or data.get("vlPreco")
-            or data.get("valor")
-            or "0"
-        )
-        price_value = _parse_price(price_str)
-        return price_value
+        results = {}
+        if isinstance(data, list):
+            for item in data:
+                co_produto = item.get("coProduto", "")
+                price_str = (
+                    item.get("pcFinal")
+                    or item.get("precoFinal")
+                    or item.get("vlPreco")
+                    or item.get("valor")
+                    or "0"
+                )
+                results[co_produto] = _parse_price(price_str)
+        elif isinstance(data, dict):
+            co_produto = data.get("coProduto", services[0] if services else "")
+            price_str = (
+                data.get("pcFinal")
+                or data.get("precoFinal")
+                or data.get("vlPreco")
+                or data.get("valor")
+                or "0"
+            )
+            results[co_produto] = _parse_price(price_str)
 
-    def _get_deadline(
+        return results
+
+    def _batch_deadline(
         self,
-        headers: dict,
-        service_code: str,
+        token: str,
+        services: list[str],
         package: PackageData,
-    ) -> int | None:
-        url = (
-            f"{CORREIOS_API_BASE}/prazo/v1/nacional/{service_code}"
-            f"?cepOrigem={self._config.cep_origem}"
-            f"&cepDestino={package.destination_zip_code}"
-        )
+    ) -> dict[str, int]:
+        """Query deadlines for all services in a single POST."""
+        url = f"{CORREIOS_API_BASE}/prazo/v1/nacional"
+
+        parametros = []
+        today = datetime.now().strftime("%Y-%m-%d")
+        for service_code in services:
+            parametros.append({
+                "coProduto": service_code,
+                "nuRequisicao": f"prazo-{service_code}",
+                "cepOrigem": self._config.cep_origem,
+                "cepDestino": package.destination_zip_code,
+                "dataPostagem": today,
+            })
+
+        payload = {
+            "idLote": "freight-batch",
+            "parametrosPrazo": parametros,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
 
         try:
-            response = httpx.get(
+            response = httpx.post(
                 url,
+                json=payload,
                 headers=headers,
                 timeout=httpx.Timeout(
                     connect=self._config.connect_timeout,
@@ -275,22 +348,24 @@ class CorreiosFreightClient:
             )
             response.raise_for_status()
             data = response.json()
-        except Exception:
-            return None
+        except httpx.TimeoutException:
+            return {}
+        except httpx.HTTPStatusError:
+            return {}
+        except httpx.RequestError:
+            return {}
 
-        days = data.get("prazoEntrega") or data.get("prazo") or data.get("dias") or 0
-        return int(days) if days else None
+        results = {}
+        if isinstance(data, list):
+            for item in data:
+                co_produto = item.get("coProduto", "")
+                days = item.get("prazoEntrega") or item.get("prazo") or item.get("dias") or 0
+                if days:
+                    results[co_produto] = int(days)
+        elif isinstance(data, dict):
+            co_produto = data.get("coProduto", services[0] if services else "")
+            days = data.get("prazoEntrega") or data.get("prazo") or data.get("dias") or 0
+            if days:
+                results[co_produto] = int(days)
 
-
-def _parse_price(value: Any) -> int:
-    if isinstance(value, (int, float)):
-        return int(float(value) * 100)
-
-    if isinstance(value, str):
-        cleaned = value.replace(".", "").replace(",", ".")
-        try:
-            return int(float(cleaned) * 100)
-        except (ValueError, TypeError):
-            return 0
-
-    return 0
+        return results

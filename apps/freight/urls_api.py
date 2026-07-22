@@ -6,5 +6,6 @@ from . import api
 app_name = "freight"
 
 urlpatterns = [
+    path("freight/cep/", api.lookup_cep_view, name="lookup_cep"),
     path("freight/calculate/", api.calculate_freight_view, name="calculate_freight"),
 ]

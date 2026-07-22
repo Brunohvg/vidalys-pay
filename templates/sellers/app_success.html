@@ -1,4 +1,5 @@
 {% extends "sellers/app_base.html" %}
+{% load formatting %}
 
 {% block content %}
 {% if link %}
@@ -8,12 +9,20 @@
     <h2 style="font-size: var(--text-xl); font-weight: 700; color: var(--color-navy-900); margin-bottom: var(--space-2);">Link criado com sucesso!</h2>
     <p style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-6);">Seu link de pagamento está pronto para ser compartilhado.</p>
 
-    <div class="success-amount">R$ {{ link.amount_cents|floatformat:2 }}</div>
+    <div class="success-amount">{{ link.amount_cents|format_brl }}</div>
     <div class="success-installments">{{ link.installments }}x sem juros · {{ link.reference }}</div>
 
-    <div class="whatsapp-status" id="whatsappStatus">
-        <span class="dot dot--sending"></span>
-        <span>Enviando link pelo WhatsApp...</span>
+    <div id="whatsappStatuses" style="margin-top: var(--space-4); width: 100%; max-width: 320px; margin-inline: auto;">
+        <div class="whatsapp-status" id="whatsappSeller">
+            <span class="dot dot--sending"></span>
+            <span>Enviando link para seu WhatsApp...</span>
+        </div>
+        {% if link.customer_phone %}
+        <div class="whatsapp-status" id="whatsappCustomer" style="margin-top: var(--space-2);">
+            <span class="dot dot--sending"></span>
+            <span>Enviando link para o cliente...</span>
+        </div>
+        {% endif %}
     </div>
 
     <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-6); max-width: 320px; margin-inline: auto;">
@@ -46,13 +55,52 @@
 {% block scripts %}
 <script>
 {% if link %}
-// Simulate WhatsApp status updates
-setTimeout(() => {
-    const status = document.getElementById('whatsappStatus');
-    if (status) {
-        status.innerHTML = '<span class="dot dot--sent"></span><span>Link enviado pelo WhatsApp</span>';
+// Poll WhatsApp status from the API
+async function checkWhatsAppStatus() {
+    try {
+        const response = await fetch('/api/v1/payment-links/{{ link.id }}/', {
+            headers: { 'Accept': 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const messages = data.data?.whatsapp_messages || [];
+        updateStatusDisplay(messages);
+    } catch {}
+}
+
+function updateStatusDisplay(messages) {
+    messages.forEach(msg => {
+        if (msg.recipient_type === 'seller') {
+            const el = document.getElementById('whatsappSeller');
+            if (el) el.innerHTML = getStatusHtml(msg.status, 'Seu WhatsApp');
+        }
+        if (msg.recipient_type === 'customer') {
+            const el = document.getElementById('whatsappCustomer');
+            if (el) el.innerHTML = getStatusHtml(msg.status, 'o cliente');
+        }
+    });
+}
+
+function getStatusHtml(status, target) {
+    switch (status) {
+        case 'SENT':
+            return '<span class="dot dot--sent"></span><span>Link enviado para ' + target + '</span>';
+        case 'SENDING':
+            return '<span class="dot dot--sending"></span><span>Enviando link para ' + target + '...</span>';
+        case 'FAILED':
+        case 'DEAD':
+            return '<span class="dot dot--error"></span><span>Falha ao enviar para ' + target + '</span>';
+        case 'QUEUED':
+        default:
+            return '<span class="dot dot--sending"></span><span>Aguardando envio para ' + target + '...</span>';
     }
-}, 3000);
+}
+
+// Check status periodically
+checkWhatsAppStatus();
+const statusInterval = setInterval(checkWhatsAppStatus, 3000);
+// Stop polling after 2 minutes
+setTimeout(() => clearInterval(statusInterval), 120000);
 {% endif %}
 
 async function copyLink(url) {
@@ -85,10 +133,13 @@ async function resendLink(linkId) {
             headers: {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
                 'Idempotency-Key': crypto.randomUUID(),
+                'Accept': 'application/json',
             },
         });
         if (response.ok) {
             showToast('Link reenviado!', 'success');
+            // Refresh status display
+            checkWhatsAppStatus();
         } else {
             showToast('Erro ao reenviar', 'error');
         }

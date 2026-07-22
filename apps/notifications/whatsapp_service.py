@@ -1,11 +1,12 @@
 """WhatsApp sending service — outbox pattern for reliable delivery."""
 import logging
+from dataclasses import dataclass
 
 from django.db import transaction
 
 from apps.sellers.models import Seller
 
-from .models import NotificationOutbox, WhatsAppMessage, WhatsAppMessageStatus
+from .models import NotificationOutbox, RecipientType, WhatsAppMessage, WhatsAppMessageStatus
 from .templates_msg import (
     invitation_message,
     payment_approved_message,
@@ -19,6 +20,16 @@ from .templates_msg import (
 logger = logging.getLogger("apps.notifications")
 
 
+@dataclass
+class WhatsAppDeliveryResult:
+    """Result of queuing a WhatsApp delivery."""
+
+    status: str  # queued, not_requested, duplicate
+    message_id: str | None = None
+    recipient_type: str = ""
+    recipient_phone: str = ""
+
+
 def queue_invitation(*, seller: Seller, activation_url: str) -> WhatsAppMessage:
     """Queue invitation message for a seller."""
     text = invitation_message(
@@ -29,10 +40,13 @@ def queue_invitation(*, seller: Seller, activation_url: str) -> WhatsAppMessage:
     return _queue_message(
         seller=seller,
         template_key="invitation",
+        event_type="invitation",
         text=text,
         topic="whatsapp.send",
         aggregate_type="seller",
         aggregate_id=seller.id,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -40,8 +54,15 @@ def queue_payment_link_created(
     *,
     seller: Seller,
     payment_link,
-) -> WhatsAppMessage:
-    """Queue payment link created message."""
+) -> list[WhatsAppDeliveryResult]:
+    """Queue payment link created message to seller and optionally customer.
+
+    Returns a list of delivery results for each recipient.
+    """
+    results = []
+    customer_phone = getattr(payment_link, "customer_phone", None) or None
+
+    # 1. Always queue for seller
     text = payment_link_created_message(
         reference=payment_link.reference,
         customer_name=payment_link.customer_name or None,
@@ -50,15 +71,68 @@ def queue_payment_link_created(
         payment_url=payment_link.payment_url,
     )
 
-    return _queue_message(
-        seller=seller,
-        template_key="payment_link_created",
-        text=text,
-        topic="whatsapp.send",
-        aggregate_type="payment_link",
-        aggregate_id=payment_link.id,
-        payment_link=payment_link,
-    )
+    if seller.whatsapp_phone:
+        message = _queue_message(
+            seller=seller,
+            template_key="payment_link_created",
+            event_type="payment_link_created",
+            text=text,
+            topic="whatsapp.send",
+            aggregate_type="payment_link",
+            aggregate_id=payment_link.id,
+            payment_link=payment_link,
+            recipient_phone=seller.whatsapp_phone,
+            recipient_type=RecipientType.SELLER,
+        )
+        results.append(WhatsAppDeliveryResult(
+            status="queued" if message else "duplicate",
+            message_id=str(message.id) if message else None,
+            recipient_type=RecipientType.SELLER,
+            recipient_phone=seller.whatsapp_phone,
+        ))
+    else:
+        results.append(WhatsAppDeliveryResult(
+            status="failed",
+            recipient_type=RecipientType.SELLER,
+            recipient_phone="",
+        ))
+
+    # 2. Optionally queue for customer
+    if customer_phone:
+        customer_text = payment_link_created_message(
+            reference=payment_link.reference,
+            customer_name=payment_link.customer_name or None,
+            amount_cents=payment_link.amount_cents,
+            installments=payment_link.installments,
+            payment_url=payment_link.payment_url,
+        )
+
+        message = _queue_message(
+            seller=seller,
+            template_key="payment_link_created_customer",
+            event_type="payment_link_created",
+            text=customer_text,
+            topic="whatsapp.send",
+            aggregate_type="payment_link",
+            aggregate_id=payment_link.id,
+            payment_link=payment_link,
+            recipient_phone=customer_phone,
+            recipient_type=RecipientType.CUSTOMER,
+        )
+        results.append(WhatsAppDeliveryResult(
+            status="queued" if message else "duplicate",
+            message_id=str(message.id) if message else None,
+            recipient_type=RecipientType.CUSTOMER,
+            recipient_phone=customer_phone,
+        ))
+    else:
+        results.append(WhatsAppDeliveryResult(
+            status="not_requested",
+            recipient_type=RecipientType.CUSTOMER,
+            recipient_phone="",
+        ))
+
+    return results
 
 
 def queue_payment_approved(
@@ -75,11 +149,14 @@ def queue_payment_approved(
     return _queue_message(
         seller=seller,
         template_key="payment_approved",
+        event_type="payment_approved",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
         aggregate_id=payment_link.id,
         payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -101,11 +178,14 @@ def queue_payment_failed(
     return _queue_message(
         seller=seller,
         template_key=f"payment_failed{dedup_key_suffix}",
+        event_type="payment_failed",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
         aggregate_id=payment_link.id,
         payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -116,11 +196,14 @@ def queue_payment_expired(*, seller: Seller, payment_link) -> WhatsAppMessage:
     return _queue_message(
         seller=seller,
         template_key="payment_expired",
+        event_type="payment_expired",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
         aggregate_id=payment_link.id,
         payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -131,11 +214,14 @@ def queue_payment_canceled(*, seller: Seller, payment_link) -> WhatsAppMessage:
     return _queue_message(
         seller=seller,
         template_key="payment_canceled",
+        event_type="payment_canceled",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
         aggregate_id=payment_link.id,
         payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -155,11 +241,14 @@ def queue_payment_refunded(
     return _queue_message(
         seller=seller,
         template_key=f"payment_refunded{dedup_key_suffix}",
+        event_type="payment_refunded",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
         aggregate_id=payment_link.id,
         payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
     )
 
 
@@ -167,15 +256,21 @@ def _queue_message(
     *,
     seller: Seller,
     template_key: str,
+    event_type: str,
     text: str,
     topic: str,
     aggregate_type: str,
     aggregate_id,
     payment_link=None,
-) -> WhatsAppMessage:
-    """Create outbox entry and WhatsApp message record."""
-    # Deduplication key: prevent duplicate messages for same aggregate + template
-    dedup_key = f"{aggregate_type}:{aggregate_id}:{template_key}"
+    recipient_phone: str,
+    recipient_type: str,
+) -> WhatsAppMessage | None:
+    """Create outbox entry and WhatsApp message record.
+
+    Deduplication key includes: aggregate + event + recipient_type + phone.
+    Returns None if a duplicate pending/processing message already exists.
+    """
+    dedup_key = f"{aggregate_type}:{aggregate_id}:{event_type}:{recipient_type}:{recipient_phone}"
 
     with transaction.atomic():
         existing = NotificationOutbox.objects.filter(
@@ -185,11 +280,7 @@ def _queue_message(
 
         if existing:
             logger.info("Mensagem duplicada ignorada: %s", dedup_key)
-            return WhatsAppMessage.objects.filter(
-                seller=seller,
-                template_key=template_key,
-                payment_link=payment_link,
-            ).order_by("-created_at").first()
+            return None
 
         NotificationOutbox.objects.filter(deduplication_key=dedup_key).delete()
 
@@ -197,12 +288,13 @@ def _queue_message(
             seller=seller,
             payment_link=payment_link,
             template_key=template_key,
-            recipient_phone=seller.whatsapp_phone,
+            event_type=event_type,
+            recipient_type=recipient_type,
+            recipient_phone=recipient_phone,
             rendered_text=text,
             status=WhatsAppMessageStatus.QUEUED,
         )
 
-        # Create outbox entry
         NotificationOutbox.objects.create(
             topic=topic,
             aggregate_type=aggregate_type,
@@ -210,15 +302,16 @@ def _queue_message(
             deduplication_key=dedup_key,
             payload={
                 "message_id": str(message.id),
-                "phone": seller.whatsapp_phone,
+                "phone": recipient_phone,
                 "text": text,
             },
             status="PENDING",
         )
 
     logger.info(
-        "Mensagem enfileirada: %s para %s",
+        "Mensagem enfileirada: %s → %s:%s",
         template_key,
-        seller.whatsapp_phone,
+        recipient_type,
+        recipient_phone,
     )
     return message

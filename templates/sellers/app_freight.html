@@ -1,133 +1,132 @@
 {% extends "sellers/app_base.html" %}
 {% load static %}
+{% load formatting %}
 
 {% block content %}
-<h2 style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--color-navy-900);">Calcular frete</h2>
+<h2 style="font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); color: var(--color-navy-900);">Calcular frete</h2>
+<p style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-5);">Consulte PAC e SEDEX para informar ao cliente.</p>
 
-<div class="card">
-    <form id="freightForm">
-        {% csrf_token %}
-
-        <div class="form-group">
-            <label class="form-label" for="destinationZip">CEP de destino</label>
+<!-- Step 1: CEP Input -->
+<div id="stepCep" class="card">
+    <div class="form-group">
+        <label class="form-label" for="destinationZip">CEP do destino</label>
+        <div style="display: flex; gap: var(--space-2);">
             <input
                 type="text"
                 id="destinationZip"
-                name="destination_zip_code"
                 class="form-input"
                 placeholder="00000-000"
                 inputmode="numeric"
                 maxlength="9"
-                required
                 autocomplete="postal-code"
+                style="flex: 1;"
             >
-            <span class="form-hint" id="cepFeedback"></span>
+            <button type="button" class="btn-primary" id="lookupCepBtn" style="white-space: nowrap;">
+                Consultar CEP
+            </button>
         </div>
-
-        <div class="form-group">
-            <label class="form-label">Tipo de pacote</label>
-            <div class="installments" role="radiogroup" aria-label="Tipo de pacote" id="presetGroup">
-                {% for preset in presets %}
-                <button
-                    type="button"
-                    class="option {% if forloop.first %}selected{% endif %}"
-                    data-weight="{{ preset.weight_grams }}"
-                    data-length="{{ preset.length_cm }}"
-                    data-width="{{ preset.width_cm }}"
-                    data-height="{{ preset.height_cm }}"
-                    role="radio"
-                    aria-checked="{% if forloop.first %}true{% else %}false{% endif %}"
-                >{{ preset.name }}</button>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div id="customFields" style="display: none;">
-            <div class="form-group">
-                <label class="form-label" for="weight">Peso (gramas)</label>
-                <input
-                    type="number"
-                    id="weight"
-                    name="weight_grams"
-                    class="form-input"
-                    placeholder="Ex: 500"
-                    min="1"
-                    max="30000"
-                    inputmode="numeric"
-                >
-                <span class="form-hint">Máximo 30 kg (30000 g)</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
-                <div class="form-group">
-                    <label class="form-label" for="length">Comprimento (cm)</label>
-                    <input
-                        type="number"
-                        id="length"
-                        name="length_cm"
-                        class="form-input"
-                        placeholder="Cm"
-                        min="1"
-                        max="105"
-                        inputmode="decimal"
-                    >
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="width">Largura (cm)</label>
-                    <input
-                        type="number"
-                        id="width"
-                        name="width_cm"
-                        class="form-input"
-                        placeholder="Cm"
-                        min="1"
-                        max="105"
-                        inputmode="decimal"
-                    >
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="height">Altura (cm)</label>
-                    <input
-                        type="number"
-                        id="height"
-                        name="height_cm"
-                        class="form-input"
-                        placeholder="Cm"
-                        min="1"
-                        max="105"
-                        inputmode="decimal"
-                    >
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="declaredValue">Valor declarado <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
-            <div class="money-input-wrapper">
-                <span class="money-prefix">R$</span>
-                <input
-                    type="text"
-                    id="declaredValue"
-                    name="declared_value"
-                    class="form-input money-input"
-                    placeholder="0,00"
-                    inputmode="decimal"
-                >
-            </div>
-            <input type="hidden" id="declared_value_cents" name="declared_value_cents" value="0">
-        </div>
-
-        <button type="submit" class="btn-primary" id="submitBtn">
-            <span class="btn-text">Calcular frete</span>
-            <span class="spinner"></span>
-        </button>
-    </form>
+        <span class="form-hint" id="cepFeedback"></span>
+    </div>
 </div>
 
+<!-- Step 2: Address Confirmation -->
+<div id="stepAddress" class="card" style="display: none;">
+    <div style="display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-4);">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--color-green-50, #ecfdf5); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-green-600, #16a34a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-size: var(--text-sm); font-weight: 600; color: var(--color-navy-900); margin-bottom: var(--space-1);">Destino encontrado</div>
+            <div id="addressStreet" style="font-size: var(--text-sm); color: var(--color-gray-700);"></div>
+            <div id="addressNeighborhood" style="font-size: var(--text-sm); color: var(--color-gray-700);"></div>
+            <div id="addressCity" style="font-size: var(--text-sm); color: var(--color-gray-700);"></div>
+            <div id="addressZip" style="font-size: var(--text-xs); color: var(--color-gray-500); margin-top: var(--space-1);"></div>
+        </div>
+    </div>
+    <div style="display: flex; gap: var(--space-2);">
+        <button type="button" class="btn-primary" id="confirmAddressBtn" style="flex: 1;">
+            Confirmar endereço
+        </button>
+        <button type="button" class="btn-secondary" id="changeCepBtn">
+            Alterar CEP
+        </button>
+    </div>
+</div>
+
+<!-- Step 3: Package Selection -->
+<div id="stepPackage" class="card" style="display: none;">
+    <div class="form-group">
+        <label class="form-label">Tipo de pacote</label>
+        <div class="installments" role="radiogroup" aria-label="Tipo de pacote" id="presetGroup">
+            {% for preset in presets %}
+            <button
+                type="button"
+                class="option {% if forloop.first %}selected{% endif %}"
+                data-weight="{{ preset.weight_grams }}"
+                data-length="{{ preset.length_cm }}"
+                data-width="{{ preset.width_cm }}"
+                data-height="{{ preset.height_cm }}"
+                role="radio"
+                aria-checked="{% if forloop.first %}true{% else %}false{% endif %}"
+            >{{ preset.name }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="customFields" style="display: none;">
+        <div class="form-group">
+            <label class="form-label" for="weight">Peso (gramas)</label>
+            <input
+                type="number"
+                id="weight"
+                class="form-input"
+                placeholder="Ex: 500"
+                min="1"
+                max="30000"
+                inputmode="numeric"
+            >
+            <span class="form-hint">Máximo 30 kg (30000 g)</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
+            <div class="form-group">
+                <label class="form-label" for="length">Comp. (cm)</label>
+                <input type="number" id="length" class="form-input" min="1" max="105" inputmode="decimal">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="width">Larg. (cm)</label>
+                <input type="number" id="width" class="form-input" min="1" max="105" inputmode="decimal">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="height">Alt. (cm)</label>
+                <input type="number" id="height" class="form-input" min="1" max="105" inputmode="decimal">
+            </div>
+        </div>
+    </div>
+
+    <div id="packageSummary" style="font-size: var(--text-xs); color: var(--color-gray-500); margin-top: var(--space-2);"></div>
+
+    <div class="form-group" style="margin-top: var(--space-4);">
+        <label class="form-label" for="declaredValue">Valor declarado <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
+        <div class="money-input-wrapper">
+            <span class="money-prefix">R$</span>
+            <input type="text" id="declaredValue" class="form-input money-input" placeholder="0,00" inputmode="decimal">
+        </div>
+        <input type="hidden" id="declared_value_cents" value="0">
+    </div>
+
+    <button type="button" class="btn-primary" id="calculateBtn" style="width: 100%;">
+        <span class="btn-text">Calcular frete</span>
+        <span class="spinner"></span>
+    </button>
+</div>
+
+<!-- Error -->
 <div id="formError" class="alert alert--danger" style="display: none;"></div>
 
-<div id="resultArea" style="display: none; margin-top: var(--space-5);">
-    <div id="destinationInfo" style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-4);"></div>
+<!-- Step 4: Results -->
+<div id="stepResults" style="display: none; margin-top: var(--space-5);">
+    <div id="resultDestination" style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-4);"></div>
 
     <div id="optionsContainer" style="display: flex; flex-direction: column; gap: var(--space-4);"></div>
 
@@ -145,29 +144,123 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('freightForm');
+    // Elements
+    const stepCep = document.getElementById('stepCep');
+    const stepAddress = document.getElementById('stepAddress');
+    const stepPackage = document.getElementById('stepPackage');
+    const stepResults = document.getElementById('stepResults');
+    const formError = document.getElementById('formError');
+    const cepFeedback = document.getElementById('cepFeedback');
+    const zipInput = document.getElementById('destinationZip');
+    const lookupCepBtn = document.getElementById('lookupCepBtn');
+    const confirmAddressBtn = document.getElementById('confirmAddressBtn');
+    const changeCepBtn = document.getElementById('changeCepBtn');
+    const calculateBtn = document.getElementById('calculateBtn');
     const presetGroup = document.getElementById('presetGroup');
     const customFields = document.getElementById('customFields');
-    const submitBtn = document.getElementById('submitBtn');
-    const errorDiv = document.getElementById('formError');
-    const resultArea = document.getElementById('resultArea');
-    const destinationInfo = document.getElementById('destinationInfo');
-    const optionsContainer = document.getElementById('optionsContainer');
-    const copySummaryBtn = document.getElementById('copySummaryBtn');
-    const recalculateBtn = document.getElementById('recalculateBtn');
-    const cepFeedback = document.getElementById('cepFeedback');
-
-    const zipInput = document.getElementById('destinationZip');
+    const packageSummary = document.getElementById('packageSummary');
     const weightInput = document.getElementById('weight');
     const lengthInput = document.getElementById('length');
     const widthInput = document.getElementById('width');
     const heightInput = document.getElementById('height');
     const declaredValue = document.getElementById('declaredValue');
     const declaredValueCents = document.getElementById('declared_value_cents');
+    const resultDestination = document.getElementById('resultDestination');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const copySummaryBtn = document.getElementById('copySummaryBtn');
+    const recalculateBtn = document.getElementById('recalculateBtn');
 
+    let currentAddress = null;
     let lastResult = null;
+    let debounceTimer = null;
 
-    // Preset selection
+    // --- CEP Input ---
+    zipInput.addEventListener('input', function(e) {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length > 8) val = val.slice(0, 8);
+        if (val.length > 5) {
+            e.target.value = val.slice(0, 5) + '-' + val.slice(5);
+        } else {
+            e.target.value = val;
+        }
+        // Auto-lookup on 8 digits
+        if (val.length === 8) {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => lookupCep(), 600);
+        }
+    });
+
+    lookupCepBtn.addEventListener('click', lookupCep);
+
+    async function lookupCep() {
+        const cep = zipInput.value.replace(/\D/g, '');
+        if (cep.length !== 8) {
+            showError('Informe um CEP válido com 8 dígitos.');
+            return;
+        }
+
+        hideError();
+        cepFeedback.textContent = 'Consultando endereço…';
+        cepFeedback.style.color = 'var(--color-gray-500)';
+        lookupCepBtn.disabled = true;
+
+        try {
+            const resp = await fetch('/api/v1/freight/cep/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: JSON.stringify({ zip_code: cep }),
+            });
+
+            const data = await resp.json();
+
+            if (resp.ok && data.data) {
+                currentAddress = data.data;
+                showAddressStep();
+            } else {
+                const msg = data.error?.message || 'CEP não encontrado.';
+                cepFeedback.textContent = msg;
+                cepFeedback.style.color = 'var(--color-danger)';
+                currentAddress = null;
+            }
+        } catch {
+            cepFeedback.textContent = 'Erro de conexão. Tente novamente.';
+            cepFeedback.style.color = 'var(--color-danger)';
+            currentAddress = null;
+        } finally {
+            lookupCepBtn.disabled = false;
+        }
+    }
+
+    function showAddressStep() {
+        if (!currentAddress) return;
+        const a = currentAddress;
+        document.getElementById('addressStreet').textContent = a.street || '';
+        document.getElementById('addressNeighborhood').textContent = a.neighborhood || '';
+        document.getElementById('addressCity').textContent = a.city && a.state ? a.city + ' — ' + a.state : (a.city || a.state || '');
+        document.getElementById('addressZip').textContent = 'CEP ' + a.zip_code;
+
+        stepCep.style.display = 'none';
+        stepAddress.style.display = 'block';
+        stepPackage.style.display = 'none';
+        stepResults.style.display = 'none';
+    }
+
+    confirmAddressBtn.addEventListener('click', function() {
+        stepAddress.style.display = 'none';
+        stepPackage.style.display = 'block';
+        updatePackageSummary();
+    });
+
+    changeCepBtn.addEventListener('click', function() {
+        stepAddress.style.display = 'none';
+        stepCep.style.display = 'block';
+        currentAddress = null;
+    });
+
+    // --- Package presets ---
     presetGroup.querySelectorAll('.option').forEach(btn => {
         btn.addEventListener('click', function() {
             presetGroup.querySelectorAll('.option').forEach(b => {
@@ -186,49 +279,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 widthInput.value = this.dataset.width;
                 heightInput.value = this.dataset.height;
             }
+            updatePackageSummary();
         });
     });
 
-    // CEP formatting
-    zipInput.addEventListener('input', function(e) {
-        let val = e.target.value.replace(/\D/g, '');
-        if (val.length > 8) val = val.slice(0, 8);
-        if (val.length > 5) {
-            e.target.value = val.slice(0, 5) + '-' + val.slice(5);
+    [weightInput, lengthInput, widthInput, heightInput].forEach(el => {
+        if (el) el.addEventListener('input', updatePackageSummary);
+    });
+
+    function updatePackageSummary() {
+        const selectedPreset = presetGroup.querySelector('.option.selected');
+        let w = selectedPreset && selectedPreset.dataset.weight !== '0'
+            ? parseInt(selectedPreset.dataset.weight) : parseInt(weightInput.value) || 0;
+        let l = selectedPreset && selectedPreset.dataset.length !== '0'
+            ? parseFloat(selectedPreset.dataset.length) : parseFloat(lengthInput.value) || 0;
+        let wi = selectedPreset && selectedPreset.dataset.width !== '0'
+            ? parseFloat(selectedPreset.dataset.width) : parseFloat(widthInput.value) || 0;
+        let h = selectedPreset && selectedPreset.dataset.height !== '0'
+            ? parseFloat(selectedPreset.dataset.height) : parseFloat(heightInput.value) || 0;
+
+        if (w > 0 && l > 0 && wi > 0 && h > 0) {
+            packageSummary.textContent = w + 'g · ' + l + '×' + wi + '×' + h + ' cm';
         } else {
-            e.target.value = val;
+            packageSummary.textContent = '';
         }
-    });
+    }
 
-    zipInput.addEventListener('blur', async function() {
-        const cep = this.value.replace(/\D/g, '');
-        if (cep.length !== 8) return;
-        try {
-            const resp = await fetch(`/api/v1/freight/calculate/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
-                body: JSON.stringify({
-                    destination_zip_code: cep,
-                    weight_grams: 100,
-                    length_cm: '20',
-                    width_cm: '15',
-                    height_cm: '2',
-                }),
-            });
-            if (resp.ok) {
-                const d = await resp.json();
-                if (d.data?.destination?.city) {
-                    cepFeedback.textContent = d.data.destination.city + '/' + d.data.destination.state;
-                    cepFeedback.style.color = 'var(--color-green-600)';
-                }
-            }
-        } catch {}
-    });
-
-    // Declared value formatting
+    // --- Declared value ---
     declaredValue.addEventListener('input', function(e) {
         let val = e.target.value.replace(/[^\d]/g, '');
         if (val) {
@@ -241,42 +318,39 @@ document.addEventListener('DOMContentLoaded', function() {
         declaredValueCents.value = val ? Math.round(parseFloat(val.replace('.', '').replace(',', '.')) * 100) : '0';
     });
 
-    // Form submission
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    // --- Calculate ---
+    calculateBtn.addEventListener('click', calculateFreight);
+
+    async function calculateFreight() {
         hideError();
 
         const cep = zipInput.value.replace(/\D/g, '');
         if (cep.length !== 8) {
-            showError('Informe um CEP valido com 8 digitos.');
+            showError('Informe um CEP válido com 8 dígitos.');
             return;
         }
 
         const selectedPreset = presetGroup.querySelector('.option.selected');
         let weight = selectedPreset && selectedPreset.dataset.weight !== '0'
-            ? parseInt(selectedPreset.dataset.weight)
-            : parseInt(weightInput.value) || 0;
+            ? parseInt(selectedPreset.dataset.weight) : parseInt(weightInput.value) || 0;
         let length = selectedPreset && selectedPreset.dataset.length !== '0'
-            ? parseFloat(selectedPreset.dataset.length)
-            : parseFloat(lengthInput.value) || 0;
+            ? parseFloat(selectedPreset.dataset.length) : parseFloat(lengthInput.value) || 0;
         let width = selectedPreset && selectedPreset.dataset.width !== '0'
-            ? parseFloat(selectedPreset.dataset.width)
-            : parseFloat(widthInput.value) || 0;
+            ? parseFloat(selectedPreset.dataset.width) : parseFloat(widthInput.value) || 0;
         let height = selectedPreset && selectedPreset.dataset.height !== '0'
-            ? parseFloat(selectedPreset.dataset.height)
-            : parseFloat(heightInput.value) || 0;
+            ? parseFloat(selectedPreset.dataset.height) : parseFloat(heightInput.value) || 0;
 
         if (!weight || weight <= 0) {
             showError('Informe o peso do pacote.');
             return;
         }
         if (!length || length <= 0 || !width || width <= 0 || !height || height <= 0) {
-            showError('Informe as dimensoes do pacote.');
+            showError('Informe as dimensões do pacote.');
             return;
         }
 
-        submitBtn.classList.add('loading');
-        submitBtn.disabled = true;
+        calculateBtn.classList.add('loading');
+        calculateBtn.disabled = true;
 
         try {
             const response = await fetch('/api/v1/freight/calculate/', {
@@ -299,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 lastResult = data.data;
-                showResult(data.data);
+                showResults(data.data);
             } else {
                 const rawMsg = typeof data.error?.message === 'string'
                     ? data.error.message
@@ -313,23 +387,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (err) {
             if (!navigator.onLine) {
-                showError('Sem conexao. Verifique sua internet.');
+                showError('Sem conexão. Verifique sua internet.');
             } else {
-                showError('Erro de conexao. Tente novamente.');
+                showError('Erro de conexão. Tente novamente.');
             }
         } finally {
-            submitBtn.classList.remove('loading');
-            submitBtn.disabled = false;
+            calculateBtn.classList.remove('loading');
+            calculateBtn.disabled = false;
         }
-    });
+    }
 
-    function showResult(data) {
+    function showResults(data) {
         const dest = data.destination;
-        if (dest?.city) {
-            destinationInfo.textContent = 'Destino: ' + dest.city + '/' + dest.state + ' — CEP ' + (dest.zip_code || '').replace(/(\d{5})(\d{3})/, '$1-$2');
-        } else {
-            destinationInfo.textContent = 'CEP: ' + (dest.zip_code || '').replace(/(\d{5})(\d{3})/, '$1-$2');
-        }
+        const destParts = [];
+        if (dest?.city) destParts.push(dest.city + '/' + dest.state);
+        if (dest?.zip_code) destParts.push('CEP ' + dest.zip_code);
+        resultDestination.textContent = 'Destino: ' + (destParts.join(' — ') || dest.zip_code || '');
 
         optionsContainer.innerHTML = '';
 
@@ -352,15 +425,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let deadline = '';
             if (opt.delivery_days) {
-                deadline = '<p style="font-size: var(--text-sm); color: var(--color-gray-500);">Prazo estimado: ' + opt.delivery_days + ' dias uteis</p>';
+                deadline = '<p style="font-size: var(--text-sm); color: var(--color-gray-500);">Prazo estimado: até ' + opt.delivery_days + ' dias úteis</p>';
             }
+
+            const copyText = opt.service_name + ' para ' + (dest?.zip_code || '') + '\nValor: ' + (opt.formatted_price || 'Indisponível') + '\nPrazo estimado: até ' + (opt.delivery_days || '?') + ' dias úteis.';
 
             card.innerHTML = badge +
                 '<h3 style="font-size: var(--text-lg); font-weight: 700; color: var(--color-navy-900); margin-bottom: var(--space-2);">' +
                 opt.service_name + '</h3>' +
                 priceHtml + deadline +
                 '<button type="button" class="btn-whatsapp" style="margin-top: var(--space-3); padding: var(--space-2) var(--space-4); font-size: var(--text-sm);" ' +
-                'onclick="navigator.clipboard.writeText(\'' + opt.service_name + ': ' + (opt.formatted_price || 'Indisponivel') + ' — prazo estimado de ' + (opt.delivery_days || '?') + ' dias uteis.\')' +
+                'onclick="navigator.clipboard.writeText(\'' + copyText.replace(/'/g, "\\'").replace(/\n/g, "\\n") + '\')' +
                 '.then(function() { showToast(\'Copiado!\', \'success\'); })' +
                 '.catch(function() { showToast(\'Erro ao copiar\', \'error\'); })">' +
                 'Copiar valor</button>';
@@ -368,23 +443,21 @@ document.addEventListener('DOMContentLoaded', function() {
             optionsContainer.appendChild(card);
         });
 
-        form.style.display = 'none';
-        resultArea.style.display = 'block';
+        stepPackage.style.display = 'none';
+        stepResults.style.display = 'block';
     }
 
     copySummaryBtn.addEventListener('click', function() {
         if (!lastResult) return;
         const dest = lastResult.destination;
-        let text = 'Frete para o CEP ' + (dest.zip_code || '').replace(/(\d{5})(\d{3})/, '$1-$2');
-        if (dest?.city) text += ' (' + dest.city + '/' + dest.state + ')';
-        text += ':\n\n';
-
+        let text = 'Frete para ' + (dest?.city ? dest.city + '/' + dest.state : '') + ' — CEP ' + (dest?.zip_code || '') + '\n\n';
         lastResult.options.forEach(function(opt) {
-            text += opt.service_name + ': ' + (opt.formatted_price || 'Indisponivel');
-            if (opt.delivery_days) text += ' — ate ' + opt.delivery_days + ' dias uteis';
+            text += opt.service_name + ': ' + (opt.formatted_price || 'Indisponível');
+            if (opt.delivery_days) text += ' — até ' + opt.delivery_days + ' dias úteis';
             if (!opt.official && opt.official !== undefined) text += ' (estimado)';
             text += '\n';
         });
+        text += '\nOs prazos são estimados pelos Correios.';
 
         navigator.clipboard.writeText(text)
             .then(function() { showToast('Resumo copiado!', 'success'); })
@@ -392,19 +465,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     recalculateBtn.addEventListener('click', function() {
-        form.style.display = 'block';
-        resultArea.style.display = 'none';
-        errorDiv.style.display = 'none';
+        stepResults.style.display = 'none';
+        stepPackage.style.display = 'block';
         lastResult = null;
     });
 
     function showError(msg) {
-        errorDiv.textContent = msg;
-        errorDiv.style.display = 'flex';
+        formError.textContent = msg;
+        formError.style.display = 'flex';
     }
 
     function hideError() {
-        errorDiv.style.display = 'none';
+        formError.style.display = 'none';
     }
 });
 </script>

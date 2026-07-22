@@ -1,5 +1,6 @@
 """Freight API endpoints."""
 import logging
+import re
 
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -28,26 +29,90 @@ logger = logging.getLogger("apps.freight")
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@rate_limit(max_requests=30, window_seconds=60)
+@seller_login_required
+def lookup_cep_view(request: Request) -> Response:
+    """Look up CEP address via ViaCEP with BrasilAPI fallback.
+
+    POST /api/v1/freight/cep/
+    Body: {"zip_code": "30140071"}
+    """
+    data = request.data
+    zip_code = re.sub(r"\D", "", str(data.get("zip_code") or ""))
+
+    if len(zip_code) != 8:
+        return Response(
+            {"error": {"code": "invalid_zip", "message": "Informe um CEP válido com oito números."}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    result = lookup_cep(zip_code)
+
+    if result is None:
+        return Response(
+            {"error": {"code": "not_found", "message": "CEP não encontrado."}},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response({
+        "data": {
+            "zip_code": f"{result.zip_code[:5]}-{result.zip_code[5:]}",
+            "street": result.street,
+            "neighborhood": result.neighborhood,
+            "city": result.city,
+            "state": result.state,
+            "source": result.source,
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @rate_limit(max_requests=20, window_seconds=60)
 @seller_login_required
 def calculate_freight_view(request: Request) -> Response:
+    """Calculate freight for PAC and SEDEX.
+
+    POST /api/v1/freight/calculate/
+    """
     data = request.data
     seller = request.seller
 
-    destination_zip_code = (data.get("destination_zip_code") or "").strip().replace("-", "")
+    destination_zip_code = re.sub(r"\D", "", str(data.get("destination_zip_code") or ""))
     weight_grams = data.get("weight_grams", 0)
     length_cm = data.get("length_cm", 0)
     width_cm = data.get("width_cm", 0)
     height_cm = data.get("height_cm", 0)
     declared_value_cents = data.get("declared_value_cents", 0)
 
+    # Validate CEP first
+    if len(destination_zip_code) != 8:
+        return Response(
+            {"error": {"code": "invalid_zip", "message": "Informe um CEP válido com oito números."}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Look up address
+    destination = lookup_cep(destination_zip_code)
+    dest_dict = None
+    if destination:
+        dest_dict = {
+            "zip_code": f"{destination.zip_code[:5]}-{destination.zip_code[5:]}",
+            "street": destination.street,
+            "neighborhood": destination.neighborhood,
+            "city": destination.city,
+            "state": destination.state,
+        }
+
+    # Validate and build package
     try:
         package = validate_and_build_package(
             destination_zip_code=destination_zip_code,
             weight_grams=int(weight_grams),
-            length_cm=float(length_cm),
-            width_cm=float(width_cm),
-            height_cm=float(height_cm),
+            length_cm=length_cm,
+            width_cm=width_cm,
+            height_cm=height_cm,
             declared_value_cents=int(declared_value_cents),
         )
     except FreightValidationError as e:
@@ -55,7 +120,7 @@ def calculate_freight_view(request: Request) -> Response:
             {
                 "error": {
                     "code": "validation_error",
-                    "message": "Dados do pacote invalidos.",
+                    "message": "Dados do pacote inválidos.",
                     "field_errors": e.args[0] if e.args else {},
                 }
             },
@@ -69,6 +134,7 @@ def calculate_freight_view(request: Request) -> Response:
         int(weight_grams),
     )
 
+    # Calculate freight
     try:
         options = calculate_freight(package)
     except FreightConfigurationError as e:
@@ -82,8 +148,6 @@ def calculate_freight_view(request: Request) -> Response:
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    destination = lookup_cep(destination_zip_code)
-
     formatted_options = []
     for opt in options:
         formatted_options.append({
@@ -96,13 +160,23 @@ def calculate_freight_view(request: Request) -> Response:
             "error": opt.error,
         })
 
+    formatted_zip = f"{destination_zip_code[:5]}-{destination_zip_code[5:]}"
+
     response_data = {
         "data": {
-            "destination": destination
+            "destination": dest_dict
             or {
-                "zip_code": destination_zip_code,
-                "city": None,
-                "state": None,
+                "zip_code": formatted_zip,
+                "street": "",
+                "neighborhood": "",
+                "city": "",
+                "state": "",
+            },
+            "package": {
+                "weight_grams": package.weight_grams,
+                "length_cm": package.length_cm,
+                "width_cm": package.width_cm,
+                "height_cm": package.height_cm,
             },
             "options": formatted_options,
         }

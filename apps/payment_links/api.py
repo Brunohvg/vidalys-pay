@@ -165,6 +165,10 @@ def create_payment_link_view(request: Request) -> Response:
 
     # Build response
     link = result.payment_link
+
+    # Queue WhatsApp notifications (seller + optional customer)
+    whatsapp_status = _queue_whatsapp_notifications(seller=seller, payment_link=link)
+
     response_data = {
         "data": {
             "id": str(link.id),
@@ -175,9 +179,7 @@ def create_payment_link_view(request: Request) -> Response:
             "status": link.status,
             "payment_url": link.payment_url or None,
             "expires_at": link.expires_at.isoformat() if link.expires_at else None,
-            "whatsapp_delivery": {
-                "status": "QUEUED" if link.status == "ACTIVE" else "PENDING",
-            },
+            "whatsapp": whatsapp_status,
             "created_at": link.created_at.isoformat(),
         }
     }
@@ -289,6 +291,22 @@ def get_payment_link_view(request: Request, link_id: str) -> Response:
     # Build timeline
     timeline = _build_timeline(link, attempts)
 
+    # Get WhatsApp messages for this link
+    from apps.notifications.models import WhatsAppMessage
+
+    whatsapp_messages = link.whatsapp_messages.order_by("created_at")
+    whatsapp_data = [
+        {
+            "id": str(msg.id),
+            "recipient_type": msg.recipient_type,
+            "recipient_phone": msg.recipient_phone,
+            "status": msg.status,
+            "event_type": msg.event_type,
+            "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
+        }
+        for msg in whatsapp_messages
+    ]
+
     data = {
         "id": str(link.id),
         "reference": link.reference,
@@ -309,6 +327,7 @@ def get_payment_link_view(request: Request, link_id: str) -> Response:
         "updated_at": link.updated_at.isoformat(),
         "attempts": attempts_data,
         "timeline": timeline,
+        "whatsapp_messages": whatsapp_data,
     }
 
     return Response({"data": data})
@@ -345,20 +364,55 @@ def resend_payment_link_view(request: Request, link_id: str) -> Response:
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
-    # Queue WhatsApp message
-    from apps.notifications.whatsapp_service import queue_payment_link_created
-
-    message = queue_payment_link_created(seller=seller, payment_link=link)
+    # Queue WhatsApp notifications (seller + optional customer)
+    whatsapp_status = _queue_whatsapp_notifications(seller=seller, payment_link=link)
 
     return Response(
         {
             "data": {
-                "message_id": str(message.id),
-                "status": "QUEUED",
+                "whatsapp": whatsapp_status,
             }
         },
         status=status.HTTP_202_ACCEPTED,
     )
+
+
+def _queue_whatsapp_notifications(*, seller, payment_link) -> dict:
+    """Queue WhatsApp notifications for seller and optionally customer.
+
+    Returns a dict with separate statuses for each recipient.
+    """
+    from apps.notifications.whatsapp_service import queue_payment_link_created
+
+    results = queue_payment_link_created(seller=seller, payment_link=payment_link)
+
+    whatsapp = {}
+    for result in results:
+        whatsapp[result.recipient_type] = {
+            "status": result.status,
+            "message": _whatsapp_status_message(result),
+        }
+
+    return whatsapp
+
+
+def _whatsapp_status_message(result) -> str:
+    """Return a user-friendly message for the WhatsApp delivery status."""
+    if result.recipient_type == "seller":
+        if result.status == "queued":
+            return "Envio para seu WhatsApp agendado."
+        elif result.status == "duplicate":
+            return "Envio para seu WhatsApp já está na fila."
+        elif result.status == "failed":
+            return "Não foi possível agendar envio para seu WhatsApp."
+    elif result.recipient_type == "customer":
+        if result.status == "queued":
+            return "Envio para o cliente agendado."
+        elif result.status == "duplicate":
+            return "Envio para o cliente já está na fila."
+        elif result.status == "not_requested":
+            return "Cliente sem telefone informado."
+    return ""
 
 
 def _get_last_attempt_status(link) -> str | None:

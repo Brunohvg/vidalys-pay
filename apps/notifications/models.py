@@ -12,6 +12,11 @@ class WhatsAppMessageStatus(models.TextChoices):
     DEAD = "DEAD", "Permanente"
 
 
+class RecipientType(models.TextChoices):
+    SELLER = "seller", "Vendedor"
+    CUSTOMER = "customer", "Cliente"
+
+
 class WhatsAppMessage(UUIDModel):
     """Mensagem enviada ou enfileirada para WhatsApp."""
 
@@ -24,6 +29,12 @@ class WhatsAppMessage(UUIDModel):
         related_name="whatsapp_messages",
     )
     template_key = models.CharField(max_length=80)
+    event_type = models.CharField(max_length=80, blank=True, default="")
+    recipient_type = models.CharField(
+        max_length=20,
+        choices=RecipientType.choices,
+        default=RecipientType.SELLER,
+    )
     recipient_phone = models.CharField(max_length=20)
     rendered_text = models.TextField()
     provider_message_id = models.CharField(max_length=120, blank=True, default="")
@@ -44,7 +55,7 @@ class WhatsAppMessage(UUIDModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.template_key} → {self.recipient_phone}"
+        return f"{self.template_key} → {self.recipient_type}:{self.recipient_phone}"
 
 
 class OutboxStatus(models.TextChoices):
@@ -60,7 +71,7 @@ class NotificationOutbox(UUIDModel):
     topic = models.CharField(max_length=80)
     aggregate_type = models.CharField(max_length=80)
     aggregate_id = models.UUIDField(db_index=True)
-    deduplication_key = models.CharField(max_length=180, unique=True)
+    deduplication_key = models.CharField(max_length=200, unique=True)
     payload = models.JSONField()
     status = models.CharField(
         max_length=20,
