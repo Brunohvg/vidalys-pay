@@ -12,6 +12,7 @@ from apps.freight.config import (
     PRODUCT_LABELS,
     REQUEST_TIMEOUT_SECONDS,
     CorreiosConfig,
+    get_additional_delivery_days,
     get_correios_config,
     is_correios_configured,
 )
@@ -31,6 +32,7 @@ from apps.freight.exceptions import (
     FreightTimeoutError,
 )
 from apps.freight.services import (
+    _sort_options,
     format_price_cents,
     lookup_cep,
     validate_and_build_package,
@@ -801,6 +803,211 @@ def test_personalizado_has_zero_values():
     assert pers["length_cm"] == 0
     assert pers["width_cm"] == 0
     assert pers["height_cm"] == 0
+
+
+# ── additional delivery days ────────────────────────────────────────────────
+
+
+def test_additional_days_default_zero(settings):
+    if hasattr(settings, "CORREIOS_DIAS_ADICIONAIS"):
+        delattr(settings, "CORREIOS_DIAS_ADICIONAIS")
+    assert get_additional_delivery_days() == 0
+
+
+def test_additional_days_one(settings):
+    settings.CORREIOS_DIAS_ADICIONAIS = "1"
+    assert get_additional_delivery_days() == 1
+
+
+def test_additional_days_invalid_string(settings):
+    settings.CORREIOS_DIAS_ADICIONAIS = "abc"
+    assert get_additional_delivery_days() == 0
+
+
+def test_additional_days_negative(settings):
+    settings.CORREIOS_DIAS_ADICIONAIS = "-1"
+    assert get_additional_delivery_days() == 0
+
+
+# ── sort options ─────────────────────────────────────────────────────────────
+
+
+def test_sort_cheapest_first():
+    options = [
+        {"service_name": "PAC", "price_cents": 2500, "delivery_days": 5},
+        {"service_name": "SEDEX", "price_cents": 1500, "delivery_days": 2},
+    ]
+    sorted_opts = _sort_options(options)
+    assert sorted_opts[0]["service_name"] == "SEDEX"
+    assert sorted_opts[1]["service_name"] == "PAC"
+
+
+def test_sort_same_price_uses_delivery():
+    options = [
+        {"service_name": "PAC", "price_cents": 1000, "delivery_days": 8},
+        {"service_name": "SEDEX", "price_cents": 1000, "delivery_days": 3},
+    ]
+    sorted_opts = _sort_options(options)
+    assert sorted_opts[0]["service_name"] == "SEDEX"
+    assert sorted_opts[1]["service_name"] == "PAC"
+
+
+def test_sort_null_delivery_last():
+    options = [
+        {"service_name": "PAC", "price_cents": 1000, "delivery_days": None},
+        {"service_name": "SEDEX", "price_cents": 1000, "delivery_days": 3},
+    ]
+    sorted_opts = _sort_options(options)
+    assert sorted_opts[0]["delivery_days"] == 3
+    assert sorted_opts[1]["delivery_days"] is None
+
+
+def test_sort_invalid_price_last():
+    options = [
+        {"service_name": "SEDEX", "price_cents": 0, "delivery_days": 1},
+        {"service_name": "PAC", "price_cents": 1500, "delivery_days": 5},
+    ]
+    sorted_opts = _sort_options(options)
+    assert sorted_opts[0]["service_name"] == "PAC"
+    assert sorted_opts[1]["service_name"] == "SEDEX"
+
+
+# ── API is_best_option ───────────────────────────────────────────────────────
+
+from apps.freight import api as freight_api_module
+
+
+@patch.object(freight_api_module, "calculate_freight")
+@patch.object(freight_api_module, "lookup_cep")
+@patch.object(freight_api_module, "validate_and_build_package")
+def test_api_is_best_option_first(mock_validate, mock_cep, mock_calc):
+    """First valid option gets is_best_option=true."""
+    mock_cep.return_value = CEPAddressData(
+        zip_code="30140071", street="Rua A", neighborhood="B",
+        city="BH", state="MG",
+    )
+    from apps.freight.dataclasses import PackageData
+    mock_validate.return_value = PackageData(
+        destination_zip_code="30140071", weight_grams=500,
+        length_cm="20", width_cm="15", height_cm="10",
+    )
+    mock_calc.return_value = [
+        {"service_code": "03220", "service_name": "SEDEX", "price_cents": 1036,
+         "provider_delivery_days": 2, "additional_delivery_days": 1,
+         "delivery_days": 3, "official": True, "error": None, "provider": "correios"},
+        {"service_code": "03298", "service_name": "PAC", "price_cents": 1627,
+         "provider_delivery_days": 5, "additional_delivery_days": 1,
+         "delivery_days": 6, "official": True, "error": None, "provider": "correios"},
+    ]
+
+    from rest_framework.test import APIRequestFactory, force_authenticate
+    factory = APIRequestFactory()
+    request = factory.post("/api/v1/freight/calculate/", {
+        "destination_zip_code": "30140071",
+        "weight_grams": 500,
+        "length_cm": "20", "width_cm": "15", "height_cm": "10",
+    }, format="json")
+
+    from unittest.mock import MagicMock
+    request.seller = MagicMock()
+    request.seller.id = "test-id"
+
+    response = freight_api_module.calculate_freight_view(request)
+
+    assert response.status_code == 200
+    options = response.data["data"]["options"]
+    assert len(options) == 2
+    assert options[0]["is_best_option"] is True
+    assert options[1]["is_best_option"] is False
+
+
+# ── delivery_days fields in API ──────────────────────────────────────────────
+
+
+@patch.object(freight_api_module, "calculate_freight")
+@patch.object(freight_api_module, "lookup_cep")
+@patch.object(freight_api_module, "validate_and_build_package")
+def test_api_includes_provider_and_additional_days(mock_validate, mock_cep, mock_calc):
+    mock_cep.return_value = CEPAddressData(
+        zip_code="30140071", street="Rua A", neighborhood="B",
+        city="BH", state="MG",
+    )
+    from apps.freight.dataclasses import PackageData
+    mock_validate.return_value = PackageData(
+        destination_zip_code="30140071", weight_grams=300,
+        length_cm="20", width_cm="15", height_cm="8",
+    )
+    mock_calc.return_value = [
+        {"service_code": "03220", "service_name": "SEDEX", "price_cents": 1036,
+         "provider_delivery_days": 2, "additional_delivery_days": 1,
+         "delivery_days": 3, "official": True, "error": None, "provider": "correios"},
+    ]
+
+    from rest_framework.test import APIRequestFactory
+    factory = APIRequestFactory()
+    request = factory.post("/api/v1/freight/calculate/", {
+        "destination_zip_code": "30140071",
+        "weight_grams": 300,
+        "length_cm": "20", "width_cm": "15", "height_cm": "8",
+    }, format="json")
+    request.seller = MagicMock()
+    request.seller.id = "test-id"
+
+    response = freight_api_module.calculate_freight_view(request)
+
+    assert response.status_code == 200
+    opt = response.data["data"]["options"][0]
+    assert opt["provider_delivery_days"] == 2
+    assert opt["additional_delivery_days"] == 1
+    assert opt["delivery_days"] == 3
+
+
+@patch.object(freight_api_module, "calculate_freight")
+@patch.object(freight_api_module, "lookup_cep")
+@patch.object(freight_api_module, "validate_and_build_package")
+def test_api_null_delivery_stays_null(mock_validate, mock_cep, mock_calc):
+    mock_cep.return_value = CEPAddressData(
+        zip_code="30140071", street="Rua A", neighborhood="B",
+        city="BH", state="MG",
+    )
+    from apps.freight.dataclasses import PackageData
+    mock_validate.return_value = PackageData(
+        destination_zip_code="30140071", weight_grams=300,
+        length_cm="20", width_cm="15", height_cm="8",
+    )
+    mock_calc.return_value = [
+        {"service_code": "03220", "service_name": "SEDEX", "price_cents": 1036,
+         "provider_delivery_days": None, "additional_delivery_days": 0,
+         "delivery_days": None, "official": True, "error": "Prazo indisponível", "provider": "correios"},
+    ]
+
+    from rest_framework.test import APIRequestFactory
+    factory = APIRequestFactory()
+    request = factory.post("/api/v1/freight/calculate/", {
+        "destination_zip_code": "30140071",
+        "weight_grams": 300,
+        "length_cm": "20", "width_cm": "15", "height_cm": "8",
+    }, format="json")
+    request.seller = MagicMock()
+    request.seller.id = "test-id"
+
+    response = freight_api_module.calculate_freight_view(request)
+
+    assert response.status_code == 200
+    opt = response.data["data"]["options"][0]
+    assert opt["provider_delivery_days"] is None
+    assert opt["delivery_days"] is None
+
+
+# ── env.example includes CORREIOS_DIAS_ADICIONAIS ─────────────────────────────
+
+
+def test_dotenv_has_additional_days():
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", ".env.example")
+    with open(path) as f:
+        content = f.read()
+    assert "CORREIOS_DIAS_ADICIONAIS" in content
 
 
 # ── env examples ─────────────────────────────────────────────────────────────

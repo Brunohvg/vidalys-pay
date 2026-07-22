@@ -40,6 +40,33 @@ DEADLINE_URL = "https://api.correios.com.br/prazo/v1/nacional"
 
 DEFAULT_PRODUCTS = ["03298", "03220"]
 
+
+# ── additional delivery days ─────────────────────────────────────────────────
+
+def get_additional_delivery_days() -> int:
+    """CORREIOS_DIAS_ADICIONAIS — extra days added to the provider deadline.
+
+    Default 0.  Invalid/negative values are clamped to 0 with a warning.
+    """
+    from django.conf import settings
+
+    raw = getattr(settings, "CORREIOS_DIAS_ADICIONAIS", "0")
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "correios_dias_adicionais_invalido=true raw=%s", repr(raw),
+        )
+        return 0
+
+    if days < 0:
+        logger.warning(
+            "correios_dias_adicionais_negativo=true raw=%s clamped=0", repr(raw),
+        )
+        return 0
+
+    return days
+
 PRODUCT_LABELS = {
     "03298": "PAC",
     "03220": "SEDEX",

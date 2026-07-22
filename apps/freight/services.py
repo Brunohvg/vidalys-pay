@@ -6,7 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import httpx
 from django.core.cache import cache
 
-from .config import PACKAGE_PRESETS, get_correios_config, is_correios_configured
+from .config import PACKAGE_PRESETS, get_additional_delivery_days, get_correios_config, is_correios_configured
 from .correios import CorreiosFreightClient
 from .dataclasses import CEPAddressData, FreightOption, PackageData
 from .exceptions import (
@@ -78,6 +78,21 @@ def validate_and_build_package(
     )
 
 
+def _sort_options(options: list[dict]) -> list[dict]:
+    """Sort freight options: cheapest first, then by delivery days."""
+    def sort_key(opt: dict) -> tuple:
+        price = opt.get("price_cents", 0) or 0
+        has_valid = price > 0
+        days = opt.get("delivery_days")
+        return (
+            0 if has_valid else 1,
+            price if has_valid else float("inf"),
+            days if days is not None else float("inf"),
+        )
+
+    return sorted(options, key=sort_key)
+
+
 def calculate_freight(package: PackageData) -> list[FreightOption]:
     config = get_correios_config()
 
@@ -91,10 +106,7 @@ def calculate_freight(package: PackageData) -> list[FreightOption]:
     cached = cache.get(cache_key)
     if cached is not None:
         logger.info("Frete cache hit: cep=%s***", package.destination_zip_code[:5])
-        return [
-            FreightOption(**opt) if isinstance(opt, dict) else opt
-            for opt in cached
-        ]
+        return cached
 
     try:
         client = CorreiosFreightClient()
@@ -118,18 +130,28 @@ def calculate_freight(package: PackageData) -> list[FreightOption]:
             "Erro ao consultar os Correios. Tente novamente."
         ) from exc
 
+    additional_days = get_additional_delivery_days()
+
     options_dicts = [
         {
             "provider": o.provider,
             "service_code": o.service_code,
             "service_name": o.service_name,
             "price_cents": o.price_cents,
-            "delivery_days": o.delivery_days,
+            "provider_delivery_days": o.delivery_days,
+            "additional_delivery_days": additional_days,
+            "delivery_days": (
+                o.delivery_days + additional_days
+                if o.delivery_days is not None
+                else None
+            ),
             "official": o.official,
             "error": o.error,
         }
         for o in options
     ]
+
+    options_dicts = _sort_options(options_dicts)
 
     cache.set(cache_key, options_dicts, timeout=_FREIGHT_CACHE_TTL)
 

@@ -22,16 +22,19 @@
         </div>
         <div class="freight-progress__steps" id="progressSteps">
             <div class="freight-progress__step freight-progress__step--active" data-step="1">
-                <span class="freight-progress__step-number">1</span>
-                Destino
+                <button type="button" class="freight-progress__step-btn" data-step="destination" aria-current="step">
+                    Destino
+                </button>
             </div>
             <div class="freight-progress__step" data-step="2">
-                <span class="freight-progress__step-number">2</span>
-                Pacote
+                <button type="button" class="freight-progress__step-btn" data-step="package" disabled aria-disabled="true">
+                    Pacote
+                </button>
             </div>
             <div class="freight-progress__step" data-step="3">
-                <span class="freight-progress__step-number">3</span>
-                Resultado
+                <button type="button" class="freight-progress__step-btn" data-step="results" disabled aria-disabled="true">
+                    Resultado
+                </button>
             </div>
         </div>
     </div>
@@ -188,48 +191,54 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Elements
-    const stepCep = document.getElementById('stepCep');
-    const stepAddress = document.getElementById('stepAddress');
-    const stepPackage = document.getElementById('stepPackage');
-    const stepResults = document.getElementById('stepResults');
-    const formError = document.getElementById('formError');
-    const errorMessage = document.getElementById('errorMessage');
-    const errorRetryBtn = document.getElementById('errorRetryBtn');
-    const zipInput = document.getElementById('destinationZip');
-    const lookupCepBtn = document.getElementById('lookupCepBtn');
-    const confirmAddressBtn = document.getElementById('confirmAddressBtn');
-    const changeCepBtn = document.getElementById('changeCepBtn');
-    const calculateBtn = document.getElementById('calculateBtn');
-    const presetGroup = document.getElementById('presetGroup');
-    const customFields = document.getElementById('customFields');
-    const packageSummary = document.getElementById('packageSummary');
-    const weightInput = document.getElementById('weight');
-    const lengthInput = document.getElementById('length');
-    const widthInput = document.getElementById('width');
-    const heightInput = document.getElementById('height');
-    const declaredValue = document.getElementById('declaredValue');
-    const declaredValueCents = document.getElementById('declared_value_cents');
-    const declaredToggle = document.getElementById('declaredToggle');
-    const declaredPanel = document.getElementById('declaredPanel');
-    const resultDestination = document.getElementById('resultDestination');
-    const optionsContainer = document.getElementById('optionsContainer');
-    const copySummaryBtn = document.getElementById('copySummaryBtn');
-    const recalculateBtn = document.getElementById('recalculateBtn');
-    const progressFill = document.getElementById('progressFill');
-    const progressSteps = document.getElementById('progressSteps');
+    // ── Elements ──────────────────────────────────────────────────────────
+    var stepCep = document.getElementById('stepCep');
+    var stepAddress = document.getElementById('stepAddress');
+    var stepPackage = document.getElementById('stepPackage');
+    var stepResults = document.getElementById('stepResults');
+    var formError = document.getElementById('formError');
+    var errorMessage = document.getElementById('errorMessage');
+    var errorRetryBtn = document.getElementById('errorRetryBtn');
+    var zipInput = document.getElementById('destinationZip');
+    var lookupCepBtn = document.getElementById('lookupCepBtn');
+    var confirmAddressBtn = document.getElementById('confirmAddressBtn');
+    var changeCepBtn = document.getElementById('changeCepBtn');
+    var calculateBtn = document.getElementById('calculateBtn');
+    var presetGroup = document.getElementById('presetGroup');
+    var customFields = document.getElementById('customFields');
+    var packageSummary = document.getElementById('packageSummary');
+    var weightInput = document.getElementById('weight');
+    var lengthInput = document.getElementById('length');
+    var widthInput = document.getElementById('width');
+    var heightInput = document.getElementById('height');
+    var declaredValue = document.getElementById('declaredValue');
+    var declaredValueCents = document.getElementById('declared_value_cents');
+    var declaredToggle = document.getElementById('declaredToggle');
+    var declaredPanel = document.getElementById('declaredPanel');
+    var resultDestination = document.getElementById('resultDestination');
+    var optionsContainer = document.getElementById('optionsContainer');
+    var copySummaryBtn = document.getElementById('copySummaryBtn');
+    var recalculateBtn = document.getElementById('recalculateBtn');
+    var progressFill = document.getElementById('progressFill');
+    var progressSteps = document.getElementById('progressSteps');
+    var stepBtns = progressSteps.querySelectorAll('.freight-progress__step-btn');
 
-    let currentAddress = null;
-    let lastResult = null;
-    let debounceTimer = null;
-    let currentStep = 1;
-    let errorRetryAction = null;
+    // ── State ─────────────────────────────────────────────────────────────
+    var freightState = {
+        currentStep: 'destination',
+        address: null,
+        addressConfirmed: false,
+        package: null,
+        result: null,
+        quoteFingerprint: null,
+    };
+    var debounceTimer = null;
+    var errorRetryAction = null;
 
+    // ── CSRF ──────────────────────────────────────────────────────────────
     function getCsrfToken() {
         var input = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (input && input.value) {
-            return input.value;
-        }
+        if (input && input.value) return input.value;
         var cookies = document.cookie ? document.cookie.split(';') : [];
         for (var i = 0; i < cookies.length; i++) {
             var c = cookies[i].trim();
@@ -243,41 +252,110 @@ document.addEventListener('DOMContentLoaded', function() {
     function buildFetchHeaders() {
         var headers = { 'Content-Type': 'application/json' };
         var token = getCsrfToken();
-        if (token) {
-            headers['X-CSRFToken'] = token;
-        }
+        if (token) headers['X-CSRFToken'] = token;
         return headers;
     }
 
-    function updateProgress(step) {
-        currentStep = step;
-        var pct = step === 1 ? 0 : (step === 2 ? 50 : 100);
-        progressFill.style.width = pct + '%';
+    // ── Navigation ────────────────────────────────────────────────────────
+    function enableStep(name, enabled) {
+        var btn = progressSteps.querySelector('[data-step="' + name + '"]');
+        if (!btn) return;
+        if (enabled) {
+            btn.removeAttribute('disabled');
+            btn.removeAttribute('aria-disabled');
+        } else {
+            btn.setAttribute('disabled', '');
+            btn.setAttribute('aria-disabled', 'true');
+        }
+    }
+
+    function updateProgressBar(step) {
+        var map = { destination: 0, package: 50, results: 100 };
+        progressFill.style.width = (map[step] || 0) + '%';
 
         var stepEls = progressSteps.querySelectorAll('.freight-progress__step');
         stepEls.forEach(function(el) {
             var s = parseInt(el.getAttribute('data-step'));
             el.classList.remove('freight-progress__step--active', 'freight-progress__step--completed');
-            if (s < step) {
-                el.classList.add('freight-progress__step--completed');
-            } else if (s === step) {
-                el.classList.add('freight-progress__step--active');
-            }
         });
+
+        var stepBtnsMap = progressSteps.querySelectorAll('.freight-progress__step-btn');
+        stepBtnsMap.forEach(function(btn) {
+            btn.removeAttribute('aria-current');
+        });
+
+        if (step === 'destination') {
+            stepEls[0].classList.add('freight-progress__step--active');
+            progressSteps.querySelector('[data-step="destination"]').setAttribute('aria-current', 'step');
+        } else if (step === 'package') {
+            stepEls[0].classList.add('freight-progress__step--completed');
+            stepEls[1].classList.add('freight-progress__step--active');
+            progressSteps.querySelector('[data-step="package"]').setAttribute('aria-current', 'step');
+        } else if (step === 'results') {
+            stepEls[0].classList.add('freight-progress__step--completed');
+            stepEls[1].classList.add('freight-progress__step--completed');
+            stepEls[2].classList.add('freight-progress__step--active');
+            progressSteps.querySelector('[data-step="results"]').setAttribute('aria-current', 'step');
+        }
     }
 
-    // --- CEP Input ---
-    zipInput.addEventListener('input', function(e) {
-        var val = e.target.value.replace(/\D/g, '');
+    function goToStep(name) {
+        var valid = ['destination', 'package', 'results'];
+        if (valid.indexOf(name) === -1) return;
+
+        if (name === 'package' && !freightState.addressConfirmed) return;
+        if (name === 'results' && !freightState.result && !freightState.quoteFingerprint) return;
+
+        freightState.currentStep = name;
+
+        stepCep.style.display = 'none';
+        stepAddress.style.display = 'none';
+        stepPackage.style.display = 'none';
+        stepResults.style.display = 'none';
+        hideError();
+
+        if (name === 'destination') {
+            stepCep.style.display = 'block';
+        } else if (name === 'package') {
+            stepPackage.style.display = 'block';
+            updatePackageSummary();
+            enableStep('results', !!freightState.result);
+        } else if (name === 'results') {
+            if (freightState.result) {
+                renderResults(freightState.result);
+                stepResults.style.display = 'block';
+            }
+        }
+
+        updateProgressBar(name);
+        enableStep('package', freightState.addressConfirmed);
+    }
+
+    stepBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var step = this.getAttribute('data-step');
+            goToStep(step);
+        });
+    });
+
+    // ── Progress bar update ───────────────────────────────────────────────
+    function updateProgress(stepNum) {
+        var map = { 1: 'destination', 2: 'package', 3: 'results' };
+        updateProgressBar(map[stepNum] || 'destination');
+    }
+
+    // ── CEP Input ─────────────────────────────────────────────────────────
+    zipInput.addEventListener('input', function() {
+        var val = this.value.replace(/\D/g, '');
         if (val.length > 8) val = val.slice(0, 8);
         if (val.length > 5) {
-            e.target.value = val.slice(0, 5) + '-' + val.slice(5);
+            this.value = val.slice(0, 5) + '-' + val.slice(5);
         } else {
-            e.target.value = val;
+            this.value = val;
         }
         if (val.length === 8) {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(function() { lookupCep(); }, 600);
+            debounceTimer = setTimeout(lookupCep, 600);
         }
     });
 
@@ -289,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function lookupCep() {
         var cep = zipInput.value.replace(/\D/g, '');
         if (cep.length !== 8) {
-            showError('Informe um CEP válido com 8 dígitos.', null, 'cep_invalid');
+            showError('Informe um CEP válido com 8 dígitos.', null);
             return;
         }
 
@@ -303,45 +381,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 credentials: 'same-origin',
                 body: JSON.stringify({ zip_code: cep }),
             });
-
             var data = await resp.json();
 
             if (resp.ok && data.data) {
-                currentAddress = data.data;
-                showAddressStep();
+                freightState.address = data.data;
+                freightState.addressConfirmed = true;
+                enableStep('package', true);
+                showAddressStep(data.data);
                 return;
             }
 
             if (resp.status === 401) {
                 showError('Sua sessão expirou. Entre novamente.',
-                    function() { window.location.reload(); }, 'session_expired');
+                    function() { window.location.reload(); });
                 return;
             }
-
             if (resp.status === 403) {
                 showError('Não foi possível validar sua sessão. Atualize a página.',
-                    function() { window.location.reload(); }, 'session_expired');
+                    function() { window.location.reload(); });
                 return;
             }
-
             if (resp.status === 404) {
                 zipInput.value = '';
                 zipInput.focus();
-                showError('CEP não encontrado. Verifique o número e tente novamente.', null, 'cep_not_found');
+                showError('CEP não encontrado. Verifique o número e tente novamente.', null);
                 return;
             }
 
             var msg = (data.error && data.error.message) ? data.error.message : 'Não foi possível consultar o endereço. Tente novamente.';
-            showError(msg, lookupCep, 'api_error');
-            currentAddress = null;
+            showError(msg, lookupCep);
+            freightState.address = null;
+            freightState.addressConfirmed = false;
+            enableStep('package', false);
         } catch (err) {
             console.error('CEP lookup failed:', err);
             if (!navigator.onLine) {
-                showError('Sem conexão com o servidor. Verifique sua internet.', lookupCep, 'connection_error');
+                showError('Sem conexão com o servidor. Verifique sua internet.', lookupCep);
             } else {
-                showError('Não foi possível consultar o endereço. Tente novamente.', lookupCep, 'api_error');
+                showError('Não foi possível consultar o endereço. Tente novamente.', lookupCep);
             }
-            currentAddress = null;
+            freightState.address = null;
+            freightState.addressConfirmed = false;
+            enableStep('package', false);
         } finally {
             setCepLoading(false);
         }
@@ -357,46 +438,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showAddressStep() {
-        if (!currentAddress) return;
-        var a = currentAddress;
-        document.getElementById('addressStreet').textContent = a.street || '';
-        document.getElementById('addressNeighborhood').textContent = a.neighborhood || '';
-        document.getElementById('addressCity').textContent = a.city && a.state ? a.city + ' — ' + a.state : (a.city || a.state || '');
-        document.getElementById('addressZip').textContent = 'CEP ' + a.zip_code;
+    function showAddressStep(addr) {
+        document.getElementById('addressStreet').textContent = addr.street || '';
+        document.getElementById('addressNeighborhood').textContent = addr.neighborhood || '';
+        document.getElementById('addressCity').textContent = addr.city && addr.state ? addr.city + ' — ' + addr.state : (addr.city || addr.state || '');
+        document.getElementById('addressZip').textContent = 'CEP ' + addr.zip_code;
 
-        stepCep.style.display = 'none';
-        stepAddress.style.display = 'block';
-        stepPackage.style.display = 'none';
-        stepResults.style.display = 'none';
         hideError();
-        updateProgress(1);
+        goToStep('destination');
     }
 
     confirmAddressBtn.addEventListener('click', function() {
-        stepAddress.style.display = 'none';
-        stepPackage.style.display = 'block';
-        stepResults.style.display = 'none';
+        freightState.addressConfirmed = true;
+        enableStep('package', true);
         updatePackageSummary();
-        updateProgress(2);
-        hideError();
+        goToStep('package');
     });
 
     changeCepBtn.addEventListener('click', function() {
-        stepAddress.style.display = 'none';
-        stepCep.style.display = 'block';
-        stepPackage.style.display = 'none';
-        stepResults.style.display = 'none';
-        currentAddress = null;
-        updateProgress(1);
-        hideError();
+        freightState.addressConfirmed = false;
+        enableStep('package', false);
+        goToStep('destination');
         zipInput.focus();
     });
 
-    // --- Package presets ---
-    presetGroup.querySelectorAll('.freight-package__item').forEach(function(btn) {
+    // ── Package presets ───────────────────────────────────────────────────
+    function getActivePresetData() {
+        var el = presetGroup.querySelector('.freight-package__item.selected');
+        if (!el) return null;
+        return el;
+    }
+
+    var presetBtns = presetGroup.querySelectorAll('.freight-package__item');
+    presetBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            presetGroup.querySelectorAll('.freight-package__item').forEach(function(b) {
+            presetBtns.forEach(function(b) {
                 b.classList.remove('selected');
                 b.setAttribute('aria-checked', 'false');
             });
@@ -412,24 +488,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 widthInput.value = this.dataset.width;
                 heightInput.value = this.dataset.height;
             }
+            invalidateQuote();
             updatePackageSummary();
         });
     });
 
     [weightInput, lengthInput, widthInput, heightInput].forEach(function(el) {
-        if (el) el.addEventListener('input', updatePackageSummary);
+        if (el) {
+            el.addEventListener('input', function() {
+                invalidateQuote();
+                updatePackageSummary();
+            });
+        }
     });
 
     function updatePackageSummary() {
-        var selectedPreset = presetGroup.querySelector('.freight-package__item.selected');
-        var w = selectedPreset && selectedPreset.dataset.weight !== '0'
-            ? parseInt(selectedPreset.dataset.weight) : parseInt(weightInput.value) || 0;
-        var l = selectedPreset && selectedPreset.dataset.length !== '0'
-            ? parseFloat(selectedPreset.dataset.length) : parseFloat(lengthInput.value) || 0;
-        var wi = selectedPreset && selectedPreset.dataset.width !== '0'
-            ? parseFloat(selectedPreset.dataset.width) : parseFloat(widthInput.value) || 0;
-        var h = selectedPreset && selectedPreset.dataset.height !== '0'
-            ? parseFloat(selectedPreset.dataset.height) : parseFloat(heightInput.value) || 0;
+        var preset = getActivePresetData();
+        var w = preset && preset.dataset.weight !== '0'
+            ? parseInt(preset.dataset.weight) : parseInt(weightInput.value) || 0;
+        var l = preset && preset.dataset.length !== '0'
+            ? parseFloat(preset.dataset.length) : parseFloat(lengthInput.value) || 0;
+        var wi = preset && preset.dataset.width !== '0'
+            ? parseFloat(preset.dataset.width) : parseFloat(widthInput.value) || 0;
+        var h = preset && preset.dataset.height !== '0'
+            ? parseFloat(preset.dataset.height) : parseFloat(heightInput.value) || 0;
 
         if (w > 0 && l > 0 && wi > 0 && h > 0) {
             packageSummary.textContent = w + 'g · ' + l + '×' + wi + '×' + h + ' cm';
@@ -438,7 +520,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Declared value ---
+    // ── Declared value ────────────────────────────────────────────────────
     declaredToggle.addEventListener('click', function() {
         var expanded = declaredToggle.getAttribute('aria-expanded') === 'true';
         if (expanded) {
@@ -452,19 +534,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    declaredValue.addEventListener('input', function(e) {
-        var val = e.target.value.replace(/[^\d]/g, '');
+    declaredValue.addEventListener('input', function() {
+        var val = this.value.replace(/[^\d]/g, '');
         if (val) {
             val = (parseInt(val) / 100).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+                minimumFractionDigits: 2, maximumFractionDigits: 2
             });
         }
-        e.target.value = val;
+        this.value = val;
         declaredValueCents.value = val ? Math.round(parseFloat(val.replace('.', '').replace(',', '.')) * 100) : '0';
+        invalidateQuote();
     });
 
-    // --- Calculate ---
+    // ── Quote fingerprint ─────────────────────────────────────────────────
+    function getPackageParams() {
+        var preset = getActivePresetData();
+        var w = preset && preset.dataset.weight !== '0'
+            ? parseInt(preset.dataset.weight) : parseInt(weightInput.value) || 0;
+        var l = preset && preset.dataset.length !== '0'
+            ? parseFloat(preset.dataset.length) : parseFloat(lengthInput.value) || 0;
+        var wi = preset && preset.dataset.width !== '0'
+            ? parseFloat(preset.dataset.width) : parseFloat(widthInput.value) || 0;
+        var h = preset && preset.dataset.height !== '0'
+            ? parseFloat(preset.dataset.height) : parseFloat(heightInput.value) || 0;
+        return { w: w, l: l, wi: wi, h: h };
+    }
+
+    function buildQuoteFingerprint() {
+        var p = getPackageParams();
+        return JSON.stringify({
+            cep: zipInput.value.replace(/\D/g, ''),
+            weight: p.w,
+            length: p.l,
+            width: p.wi,
+            height: p.h,
+            declared: parseInt(declaredValueCents.value) || 0,
+        });
+    }
+
+    function invalidateQuote() {
+        if (freightState.result) {
+            freightState.result = null;
+            freightState.quoteFingerprint = null;
+            enableStep('results', false);
+        }
+    }
+
+    // ── Calculate ─────────────────────────────────────────────────────────
     calculateBtn.addEventListener('click', calculateFreight);
 
     async function calculateFreight() {
@@ -472,26 +588,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var cep = zipInput.value.replace(/\D/g, '');
         if (cep.length !== 8) {
-            showError('Informe um CEP de destino válido com 8 dígitos.', null, 'cep_invalid');
+            showError('Informe um CEP de destino válido com 8 dígitos.', null);
             return;
         }
 
-        var selectedPreset = presetGroup.querySelector('.freight-package__item.selected');
-        var weight = selectedPreset && selectedPreset.dataset.weight !== '0'
-            ? parseInt(selectedPreset.dataset.weight) : parseInt(weightInput.value) || 0;
-        var length = selectedPreset && selectedPreset.dataset.length !== '0'
-            ? parseFloat(selectedPreset.dataset.length) : parseFloat(lengthInput.value) || 0;
-        var width = selectedPreset && selectedPreset.dataset.width !== '0'
-            ? parseFloat(selectedPreset.dataset.width) : parseFloat(widthInput.value) || 0;
-        var height = selectedPreset && selectedPreset.dataset.height !== '0'
-            ? parseFloat(selectedPreset.dataset.height) : parseFloat(heightInput.value) || 0;
-
-        if (!weight || weight <= 0) {
-            showError('Informe o peso do pacote.', null, 'validation');
+        var p = getPackageParams();
+        if (!p.w || p.w <= 0) {
+            showError('Informe o peso do pacote.', null);
             return;
         }
-        if (!length || length <= 0 || !width || width <= 0 || !height || height <= 0) {
-            showError('Informe as dimensões do pacote (comprimento, largura e altura).', null, 'validation');
+        if (!p.l || p.l <= 0 || !p.wi || p.wi <= 0 || !p.h || p.h <= 0) {
+            showError('Informe as dimensões do pacote (comprimento, largura e altura).', null);
             return;
         }
 
@@ -505,47 +612,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     destination_zip_code: cep,
-                    weight_grams: weight,
-                    length_cm: String(length),
-                    width_cm: String(width),
-                    height_cm: String(height),
+                    weight_grams: p.w,
+                    length_cm: String(p.l),
+                    width_cm: String(p.wi),
+                    height_cm: String(p.h),
                     declared_value_cents: parseInt(declaredValueCents.value) || 0,
                 }),
             });
-
             var data = await response.json();
 
             if (response.ok) {
-                lastResult = data.data;
-                showResults(data.data);
+                freightState.result = data.data;
+                freightState.quoteFingerprint = buildQuoteFingerprint();
+                enableStep('results', true);
+                renderResults(data.data);
+                goToStep('results');
             } else if (response.status === 401) {
                 showError('Sua sessão expirou. Entre novamente.',
-                    function() { window.location.reload(); }, 'session_expired');
+                    function() { window.location.reload(); });
             } else if (response.status === 403) {
                 showError('Não foi possível validar sua sessão. Atualize a página.',
-                    function() { window.location.reload(); }, 'session_expired');
+                    function() { window.location.reload(); });
             } else if (response.status === 502 || response.status === 503) {
                 showError('Os Correios estão temporariamente indisponíveis. Tente novamente em alguns instantes.',
-                    calculateFreight, 'provider_unavailable');
+                    calculateFreight);
             } else {
-                var rawMsg = typeof data.error && typeof data.error.message === 'string'
-                    ? data.error.message
+                var rawMsg = data.error && data.error.message ? data.error.message
                     : (typeof data.detail === 'string' ? data.detail : 'Erro ao calcular frete.');
                 if (data.error && data.error.field_errors) {
-                    var fields = Object.values(data.error.field_errors).flat().join(' ');
-                    showError(fields || rawMsg, null, 'validation');
-                } else {
-                    showError(rawMsg, calculateFreight, 'calculate_error');
+                    rawMsg = Object.values(data.error.field_errors).flat().join(' ');
                 }
+                showError(rawMsg, calculateFreight);
             }
         } catch (err) {
             console.error('Freight calculate failed:', err);
             if (!navigator.onLine) {
-                showError('Sem conexão com o servidor. Verifique sua internet.',
-                    calculateFreight, 'connection_error');
+                showError('Sem conexão com o servidor. Verifique sua internet.', calculateFreight);
             } else {
-                showError('Não foi possível calcular o frete. Tente novamente.',
-                    calculateFreight, 'api_error');
+                showError('Não foi possível calcular o frete. Tente novamente.', calculateFreight);
             }
         } finally {
             calculateBtn.classList.remove('loading');
@@ -553,7 +657,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showResults(data) {
+    // ── Results ───────────────────────────────────────────────────────────
+    function renderResults(data) {
         var dest = data.destination;
         var destParts = [];
         if (dest && dest.city) destParts.push(dest.city + '/' + dest.state);
@@ -562,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         optionsContainer.innerHTML = '';
 
-        data.options.forEach(function(opt) {
+        (data.options || []).forEach(function(opt, i) {
             var card = document.createElement('div');
             card.className = 'freight-result-card';
 
@@ -573,6 +678,13 @@ document.addEventListener('DOMContentLoaded', function() {
             name.className = 'freight-result-card__name';
             name.textContent = opt.service_name;
             header.appendChild(name);
+
+            if (opt.is_best_option) {
+                var best = document.createElement('span');
+                best.className = 'freight-result-card__badge freight-result-card__badge--best';
+                best.textContent = 'Menor preço';
+                header.appendChild(best);
+            }
 
             if (opt.official === true) {
                 var badge = document.createElement('span');
@@ -603,7 +715,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (opt.delivery_days) {
                 var deadline = document.createElement('p');
                 deadline.className = 'freight-result-card__deadline';
-                deadline.textContent = 'até ' + opt.delivery_days + ' dias úteis';
+                var label = opt.delivery_days === 1 ? 'dia útil' : 'dias úteis';
+                deadline.textContent = 'até ' + opt.delivery_days + ' ' + label;
                 card.appendChild(deadline);
             }
 
@@ -624,39 +737,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
             optionsContainer.appendChild(card);
         });
-
-        stepPackage.style.display = 'none';
-        stepResults.style.display = 'block';
-        updateProgress(3);
-        hideError();
     }
 
     copySummaryBtn.addEventListener('click', function() {
-        if (!lastResult) return;
-        var dest = lastResult.destination;
+        if (!freightState.result) return;
+        var data = freightState.result;
+        var dest = data.destination;
         var text = 'Frete para ' + (dest && dest.city ? dest.city + '/' + dest.state : '') + ' — CEP ' + (dest ? dest.zip_code : '') + '\n\n';
-        lastResult.options.forEach(function(opt) {
+        (data.options || []).forEach(function(opt) {
             text += opt.service_name + ': ' + (opt.formatted_price || 'Indisponível');
             if (opt.delivery_days) text += ' — até ' + opt.delivery_days + ' dias úteis';
             if (opt.official === false) text += ' (estimado)';
             text += '\n';
         });
         text += '\nOs prazos são estimados pelos Correios.';
-
         navigator.clipboard.writeText(text)
             .then(function() { showToast('Resumo copiado!', 'success'); })
             .catch(function() { showToast('Erro ao copiar', 'error'); });
     });
 
     recalculateBtn.addEventListener('click', function() {
-        stepResults.style.display = 'none';
-        stepPackage.style.display = 'block';
-        lastResult = null;
-        updateProgress(2);
-        hideError();
+        goToStep('package');
     });
 
-    function showError(msg, retryFn, code) {
+    // ── Error ─────────────────────────────────────────────────────────────
+    function showError(msg, retryFn) {
         errorMessage.textContent = msg;
         errorRetryAction = retryFn || null;
         errorRetryBtn.style.display = retryFn ? 'block' : 'none';
@@ -668,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function() {
         errorRetryAction = null;
     }
 
-    // Initial state
+    // ── Initial ───────────────────────────────────────────────────────────
     updateProgress(1);
 });
 </script>

@@ -149,15 +149,27 @@ def calculate_freight_view(request: Request) -> Response:
         )
 
     formatted_options = []
-    for opt in options:
+    for i, opt in enumerate(options):
+        provider_days = opt.get("provider_delivery_days")
+        additional_days = opt.get("additional_delivery_days", 0)
+        final_days = (
+            provider_days + additional_days
+            if provider_days is not None
+            else None
+        )
+        price_cents = opt.get("price_cents", 0)
+
         formatted_options.append({
-            "service_code": opt.service_code,
-            "service_name": opt.service_name,
-            "price_cents": opt.price_cents,
-            "formatted_price": format_price_cents(opt.price_cents) if opt.price_cents > 0 else None,
-            "delivery_days": opt.delivery_days,
-            "official": opt.official,
-            "error": opt.error,
+            "service_code": opt.get("service_code"),
+            "service_name": opt.get("service_name"),
+            "price_cents": price_cents,
+            "formatted_price": format_price_cents(price_cents) if price_cents > 0 else None,
+            "provider_delivery_days": provider_days,
+            "additional_delivery_days": additional_days,
+            "delivery_days": final_days,
+            "official": opt.get("official"),
+            "error": opt.get("error"),
+            "is_best_option": i == 0 and price_cents > 0,
         })
 
     formatted_zip = f"{destination_zip_code[:5]}-{destination_zip_code[5:]}"
