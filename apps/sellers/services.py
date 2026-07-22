@@ -57,10 +57,11 @@ def generate_invitation(*, seller: Seller, created_by=None) -> tuple[SellerInvit
     return invitation, raw_token
 
 
-def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_agent: str = "") -> tuple[SellerSession | None, str | None]:
-    """Atomically consume a valid invitation and create a session.
+def consume_invitation(*, raw_token: str) -> tuple[Seller | None, str | None]:
+    """Atomically consume a valid invitation.
 
-    Returns (SellerSession, None) if successful, (None, error_message) if invalid.
+    Returns (Seller, None) if successful, (None, error_message) if invalid.
+    The caller is responsible for creating the session.
     """
     token_hash = _hash_token(raw_token)
 
@@ -97,26 +98,8 @@ def consume_invitation(*, raw_token: str, request_ip: str | None = None, user_ag
         invitation.used_at = now
         invitation.save(update_fields=["used_at"])
 
-        from django.contrib.sessions.backends.db import SessionStore
-
-        django_session = SessionStore()
-        django_session["seller_id"] = str(seller.id)
-        django_session.create()
-
-        session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
-        session_expires = now + timedelta(days=session_days)
-
-        seller_session = SellerSession.objects.create(
-            seller=seller,
-            django_session_key=django_session.session_key,
-            ip_first=request_ip,
-            user_agent_summary=user_agent[:255],
-            expires_at=session_expires,
-            last_seen_at=now,
-        )
-
-    logger.info("Sessão criada para vendedor %s, sessão %s", seller.id, seller_session.id)
-    return seller_session, None
+    logger.info("Convite consumido para vendedor %s", seller.id)
+    return seller, None
 
 
 def revoke_all_sessions(*, seller: Seller) -> int:

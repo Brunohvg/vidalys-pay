@@ -1,11 +1,15 @@
 """Seller views — invitation activation, app pages, profile."""
 import logging
+from datetime import timedelta
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .decorators import seller_login_required
+from .models import SellerSession
 from .services import consume_invitation, revoke_all_sessions
 
 logger = logging.getLogger("apps.sellers")
@@ -21,31 +25,32 @@ def activate_invitation(request, token):
     Consumes the token atomically and creates a session.
     Redirects to /app on success.
     """
-    ip = _get_client_ip(request)
-    user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
+    seller, error_message = consume_invitation(raw_token=token)
 
-    seller_session, error_message = consume_invitation(
-        raw_token=token,
-        request_ip=ip,
-        user_agent=user_agent,
-    )
-
-    if seller_session is None:
+    if seller is None:
         return render(request, "sellers/activation_invalid.html", {
             "error_message": error_message or "Este link de acesso não é válido, já foi utilizado ou expirou.",
         }, status=400)
 
-    # Migrate session data to current request session
-    from django.contrib.sessions.backends.db import SessionStore
-    from django.contrib.sessions.models import Session
+    ip = _get_client_ip(request)
+    user_agent = request.META.get("HTTP_USER_AGENT", "")[:255]
 
-    store = SessionStore(session_key=seller_session.django_session_key)
-    request.session.update(dict(store))
-    request.session["seller_id"] = str(seller_session.seller_id)
+    now = timezone.now()
+    session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
+
+    request.session["seller_id"] = str(seller.id)
     request.session.save()
 
-    seller_session.django_session_key = request.session.session_key
-    seller_session.save(update_fields=["django_session_key"])
+    SellerSession.objects.create(
+        seller=seller,
+        django_session_key=request.session.session_key,
+        ip_first=ip,
+        user_agent_summary=user_agent,
+        expires_at=now + timedelta(days=session_days),
+        last_seen_at=now,
+    )
+
+    logger.info("Sessão criada para vendedor %s", seller.id)
 
     response = redirect("/app/")
     response["Referrer-Policy"] = "no-referrer"
