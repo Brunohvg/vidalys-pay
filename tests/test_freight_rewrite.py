@@ -263,6 +263,374 @@ def test_auth_with_cartao(mock_config):
     assert "cartaopostagem" in client._token_url
 
 
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_dr_zero_sends_int(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="",
+        dr="0",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert body["numero"] == "74835858"
+    assert body["dr"] == 0
+    assert isinstance(body["dr"], int)
+    assert "contrato" not in body
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_with_contrato(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert body["numero"] == "74835858"
+    assert body["contrato"] == "9912464418"
+    assert "dr" not in body
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_full_credentials(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="0",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert body["numero"] == "74835858"
+    assert body["contrato"] == "9912464418"
+    assert body["dr"] == 0
+    assert isinstance(body["dr"], int)
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_no_cartao_sends_none_body(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="",
+        contrato="9912464418",
+        dr="0",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["json"] is None
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_empty_contrato_omitted(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="",
+        dr="0",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert "contrato" not in body
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+def test_auth_body_empty_dr_omitted(mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"token": "fake-token", "expiraEm": 3600}
+    mock_post.return_value = mock_response
+
+    client = CorreiosAuthClient()
+    client._authenticate()
+
+    call_kwargs = mock_post.call_args.kwargs
+    body = call_kwargs["json"]
+
+    assert body is not None
+    assert "dr" not in body
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+@patch("apps.freight.correios.CorreiosAuthClient.get_token")
+def test_batch_price_nuDR_zero_from_dr_zero(mock_token, mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="0",
+        cep_origem="30170130",
+        pac_product_code="03298",
+        sedex_product_code="03220",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_token.return_value = "fake-token"
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = [
+        {"coProduto": "03298", "pcFinal": "25,00"},
+        {"coProduto": "03220", "pcFinal": "35,00"},
+    ]
+    mock_post.return_value = mock_response
+
+    package = PackageData(
+        destination_zip_code="30140071",
+        weight_grams=500,
+        length_cm="20",
+        width_cm="15",
+        height_cm="10",
+    )
+
+    client = CorreiosFreightClient()
+    client._batch_price("fake-token", ["03298", "03220"], package)
+
+    call_kwargs = mock_post.call_args.kwargs
+    payload = call_kwargs["json"]
+    params = payload["parametrosProduto"][0]
+
+    assert params["nuContrato"] == "9912464418"
+    assert params["nuDR"] == 0
+    assert isinstance(params["nuDR"], int)
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+@patch("apps.freight.correios.CorreiosAuthClient.get_token")
+def test_batch_price_omits_nuDR_when_empty(mock_token, mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="9912464418",
+        dr="",
+        cep_origem="30170130",
+        pac_product_code="03298",
+        sedex_product_code="03220",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_token.return_value = "fake-token"
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = [
+        {"coProduto": "03298", "pcFinal": "25,00"},
+    ]
+    mock_post.return_value = mock_response
+
+    package = PackageData(
+        destination_zip_code="30140071",
+        weight_grams=500,
+        length_cm="20",
+        width_cm="15",
+        height_cm="10",
+    )
+
+    client = CorreiosFreightClient()
+    client._batch_price("fake-token", ["03298"], package)
+
+    call_kwargs = mock_post.call_args.kwargs
+    payload = call_kwargs["json"]
+    params = payload["parametrosProduto"][0]
+
+    assert "nuDR" not in params
+
+
+@patch("apps.freight.correios.httpx.post")
+@patch("apps.freight.correios.get_correios_config")
+@patch("apps.freight.correios.CorreiosAuthClient.get_token")
+def test_batch_price_omits_nuContrato_when_empty(mock_token, mock_config, mock_post):
+    mock_config.return_value = MagicMock(
+        usuario="user",
+        codigo_acesso="pass",
+        cartao_postagem="74835858",
+        contrato="",
+        dr="0",
+        cep_origem="30170130",
+        pac_product_code="03298",
+        sedex_product_code="03220",
+        connect_timeout=5,
+        read_timeout=15,
+        token_cache_margin_seconds=300,
+    )
+
+    mock_token.return_value = "fake-token"
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = [
+        {"coProduto": "03298", "pcFinal": "25,00"},
+    ]
+    mock_post.return_value = mock_response
+
+    package = PackageData(
+        destination_zip_code="30140071",
+        weight_grams=500,
+        length_cm="20",
+        width_cm="15",
+        height_cm="10",
+    )
+
+    client = CorreiosFreightClient()
+    client._batch_price("fake-token", ["03298"], package)
+
+    call_kwargs = mock_post.call_args.kwargs
+    payload = call_kwargs["json"]
+    params = payload["parametrosProduto"][0]
+
+    assert "nuContrato" not in params
+
+
+# --- Sanitization helpers ---
+
+from apps.freight.correios import _sanitize_response_text
+
+
+def test_sanitize_response_text_truncates():
+    long_text = "x" * 500
+    result = _sanitize_response_text(long_text, max_length=100)
+    assert len(result) == 103  # 100 chars + "..."
+    assert result.endswith("...")
+
+
+def test_sanitize_response_text_short():
+    result = _sanitize_response_text("hello")
+    assert result == "hello"
+
+
+def test_sanitize_response_text_none():
+    result = _sanitize_response_text(None)
+    assert result == ""
+
+
+@patch("apps.freight.correios.logger")
+def test_log_http_error_includes_etapa_and_status(mock_logger):
+    from apps.freight.correios import _log_http_error
+    import httpx
+
+    fake_response = MagicMock()
+    fake_response.status_code = 500
+    fake_response.text = '{"mensagem": "erro interno"}'
+
+    exc = httpx.HTTPStatusError(
+        message="Server error",
+        request=MagicMock(),
+        response=fake_response,
+    )
+
+    _log_http_error("preco", exc, co_produto="03298")
+
+    mock_logger.warning.assert_called_once()
+    log_msg = mock_logger.warning.call_args[0][0]
+    log_extra = mock_logger.warning.call_args[0][1]
+    assert "correios_http_error=true" in log_msg
+    assert log_extra["etapa"] == "preco"
+    assert log_extra["http_status"] == 500
+    assert log_extra["coProduto"] == "03298"
+    assert "código_acesso" not in log_extra
+    assert "token" not in log_extra
+    assert "Authorization" not in log_extra
+
+
 # --- Freight option ---
 
 

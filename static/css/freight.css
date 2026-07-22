@@ -504,7 +504,34 @@
     background: rgba(0, 200, 150, 0.1);
 }
 
-/* Results bottom actions */
+/* Declared value toggle */
+.freight-declared-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    background: none;
+    border: none;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--color-gray-500);
+    cursor: pointer;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.freight-declared-toggle:hover {
+    color: var(--vidalys-blue);
+}
+
+.freight-declared-toggle[aria-expanded="true"] {
+    color: var(--vidalys-blue);
+}
+
+.freight-declared-panel {
+    margin-top: var(--space-3);
+}
 .freight-results__actions {
     display: flex;
     gap: var(--space-3);

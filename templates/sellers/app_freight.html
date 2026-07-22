@@ -141,13 +141,20 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="declaredValue">Valor declarado <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
-                <div class="money-input-wrapper">
-                    <span class="money-prefix">R$</span>
-                    <input type="text" id="declaredValue" class="form-input money-input" placeholder="0,00" inputmode="decimal">
+            <button type="button" class="freight-declared-toggle" id="declaredToggle" aria-expanded="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                Valor declarado (opcional)
+            </button>
+
+            <div class="freight-declared-panel" id="declaredPanel" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label" for="declaredValue">Valor declarado</label>
+                    <div class="money-input-wrapper">
+                        <span class="money-prefix">R$</span>
+                        <input type="text" id="declaredValue" class="form-input money-input" placeholder="0,00" inputmode="decimal">
+                    </div>
+                    <input type="hidden" id="declared_value_cents" value="0">
                 </div>
-                <input type="hidden" id="declared_value_cents" value="0">
             </div>
 
             <button type="button" class="btn-primary" id="calculateBtn">
@@ -203,6 +210,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const heightInput = document.getElementById('height');
     const declaredValue = document.getElementById('declaredValue');
     const declaredValueCents = document.getElementById('declared_value_cents');
+    const declaredToggle = document.getElementById('declaredToggle');
+    const declaredPanel = document.getElementById('declaredPanel');
     const resultDestination = document.getElementById('resultDestination');
     const optionsContainer = document.getElementById('optionsContainer');
     const copySummaryBtn = document.getElementById('copySummaryBtn');
@@ -430,6 +439,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Declared value ---
+    declaredToggle.addEventListener('click', function() {
+        var expanded = declaredToggle.getAttribute('aria-expanded') === 'true';
+        if (expanded) {
+            declaredPanel.style.display = 'none';
+            declaredToggle.setAttribute('aria-expanded', 'false');
+            declaredValue.value = '';
+            declaredValueCents.value = '0';
+        } else {
+            declaredPanel.style.display = 'block';
+            declaredToggle.setAttribute('aria-expanded', 'true');
+        }
+    });
+
     declaredValue.addEventListener('input', function(e) {
         var val = e.target.value.replace(/[^\d]/g, '');
         if (val) {

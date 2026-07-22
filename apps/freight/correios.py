@@ -72,8 +72,7 @@ class CorreiosAuthClient:
     def _authenticate(self) -> CorreiosToken:
         """Authenticate using HTTP Basic Auth.
 
-        With cartao_postagem: POST body = {"numero": "<cartao>"}
-        Without cartao_postagem: POST body = None
+        When cartao_postagem is set, sends numero, contrato, and dr in body.
         """
         auth = httpx.BasicAuth(
             self._config.usuario,
@@ -81,11 +80,17 @@ class CorreiosAuthClient:
         )
 
         body = None
-        if self._config.cartao_postagem:
-            body = {"numero": self._config.cartao_postagem}
+        if self._config.cartao_postagem != "":
+            body: dict[str, Any] = {
+                "numero": self._config.cartao_postagem,
+            }
+            if self._config.contrato != "":
+                body["contrato"] = self._config.contrato
+            if self._config.dr != "":
+                body["dr"] = int(self._config.dr)
 
         timeout = httpx.Timeout(
-            connect=self._config.connect_timeout,
+            self._config.connect_timeout,
             read=self._config.read_timeout,
         )
 
@@ -100,10 +105,16 @@ class CorreiosAuthClient:
             response.raise_for_status()
             data = response.json()
         except httpx.TimeoutException as exc:
+            logger.warning(
+                "autenticacao_correios_timeout=true connect=%s read=%s",
+                self._config.connect_timeout,
+                self._config.read_timeout,
+            )
             raise FreightProviderUnavailable(
                 "Os Correios demoraram para responder. Tente novamente."
             ) from exc
         except httpx.HTTPStatusError as exc:
+            self._log_http_error("autenticacao", exc)
             if exc.response.status_code in (401, 403):
                 raise FreightAuthenticationError(
                     "Não foi possível autenticar nos Correios. Verifique a configuração."
@@ -112,6 +123,10 @@ class CorreiosAuthClient:
                 "Os Correios estão indisponíveis. Tente novamente."
             ) from exc
         except httpx.RequestError as exc:
+            logger.warning(
+                "autenticacao_correios_request_error=true error_type=%s",
+                type(exc).__name__,
+            )
             raise FreightProviderUnavailable(
                 "Não foi possível conectar aos Correios."
             ) from exc
@@ -139,6 +154,26 @@ class CorreiosAuthClient:
             {"access_token": token_data.access_token},
             timeout=ttl,
         )
+
+
+def _sanitize_response_text(text: str, max_length: int = 300) -> str:
+    """Remove sensitive data before logging."""
+    sanitized = text or ""
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    return sanitized
+
+
+def _log_http_error(etapa: str, exc: httpx.HTTPStatusError, co_produto: str | None = None) -> None:
+    """Log HTTP errors with sanitized context."""
+    extra: dict[str, Any] = {
+        "etapa": etapa,
+        "http_status": exc.response.status_code,
+        "response_text": _sanitize_response_text(exc.response.text),
+    }
+    if co_produto:
+        extra["coProduto"] = co_produto
+    logger.warning("correios_http_error=true %s", extra)
 
 
 def _parse_price(value: Any) -> int:
@@ -231,10 +266,10 @@ class CorreiosFreightClient:
                 "altura": str(package.height_cm),
             }
 
-            if self._config.contrato:
+            if self._config.contrato != "":
                 param["nuContrato"] = self._config.contrato
-            if self._config.dr:
-                param["nuDR"] = self._config.dr
+            if self._config.dr != "":
+                param["nuDR"] = int(self._config.dr)
 
             if package.declared_value_cents > 0:
                 param["vlDeclarado"] = str(
@@ -260,23 +295,33 @@ class CorreiosFreightClient:
                 json=payload,
                 headers=headers,
                 timeout=httpx.Timeout(
-                    connect=self._config.connect_timeout,
+                    self._config.connect_timeout,
                     read=self._config.read_timeout,
                 ),
             )
             response.raise_for_status()
             data = response.json()
         except httpx.TimeoutException as exc:
+            logger.warning(
+                "preco_correios_timeout=true connect=%s read=%s",
+                self._config.connect_timeout,
+                self._config.read_timeout,
+            )
             raise FreightProviderUnavailable(
                 "Os Correios demoraram para responder. Tente novamente."
             ) from exc
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (401, 403):
                 raise FreightAuthenticationError() from exc
+            _log_http_error("preco", exc)
             raise FreightProviderUnavailable(
                 "Os Correios estão indisponíveis. Tente novamente."
             ) from exc
         except httpx.RequestError as exc:
+            logger.warning(
+                "preco_correios_request_error=true error_type=%s",
+                type(exc).__name__,
+            )
             raise FreightProviderUnavailable(
                 "Não foi possível conectar aos Correios."
             ) from exc
@@ -342,17 +387,27 @@ class CorreiosFreightClient:
                 json=payload,
                 headers=headers,
                 timeout=httpx.Timeout(
-                    connect=self._config.connect_timeout,
+                    self._config.connect_timeout,
                     read=self._config.read_timeout,
                 ),
             )
             response.raise_for_status()
             data = response.json()
         except httpx.TimeoutException:
+            logger.warning(
+                "prazo_correios_timeout=true connect=%s read=%s",
+                self._config.connect_timeout,
+                self._config.read_timeout,
+            )
             return {}
-        except httpx.HTTPStatusError:
+        except httpx.HTTPStatusError as exc:
+            _log_http_error("prazo", exc)
             return {}
-        except httpx.RequestError:
+        except httpx.RequestError as exc:
+            logger.warning(
+                "prazo_correios_request_error=true error_type=%s",
+                type(exc).__name__,
+            )
             return {}
 
         results = {}
