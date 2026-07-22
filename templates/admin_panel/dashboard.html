@@ -61,8 +61,11 @@
                 </div>
 
                 {% if item.active_invitation %}
-                    <div class="seller-card__invite">{{ item.invitation_url }}</div>
-                    <div class="seller-card__expiry">Convite expira {{ item.active_invitation.expires_at|date:"d/m/Y H:i" }}</div>
+                    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);">
+                        <span style="width:8px;height:8px;border-radius:50%;background:var(--vidalys-green);flex-shrink:0;"></span>
+                        <span style="font-size:var(--text-xs);color:var(--vidalys-green);font-weight:500;">Convite ativo</span>
+                    </div>
+                    <div class="seller-card__expiry">Expira {{ item.active_invitation.expires_at|date:"d/m/Y H:i" }}</div>
                 {% else %}
                     <div class="seller-card__expiry">Nenhum convite ativo</div>
                 {% endif %}

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,8 +18,6 @@ admin_required = user_passes_test(lambda u: u.is_superuser, login_url="admin:log
 def dashboard(request):
     sellers = Seller.objects.prefetch_related("invitations").order_by("-created_at")
 
-    base_url = settings.APP_BASE_URL.rstrip("/")
-
     seller_data = []
     for seller in sellers:
         active_invitation = next(
@@ -28,16 +27,10 @@ def dashboard(request):
         seller_data.append({
             "seller": seller,
             "active_invitation": active_invitation,
-            "invitation_url": (
-                f"{base_url}/acesso/{active_invitation.token_hash}/"
-                if active_invitation
-                else None
-            ),
         })
 
     return render(request, "admin_panel/dashboard.html", {
         "seller_data": seller_data,
-        "base_url": base_url,
     })
 
 
@@ -72,6 +65,8 @@ def create_seller(request):
     activation_url = f"{settings.APP_BASE_URL.rstrip('/')}/acesso/{raw_token}/"
     queue_invitation(seller=seller, activation_url=activation_url)
 
+    messages.success(request, f"Vendedor '{seller.name}' criado. Convite enviado para {seller.whatsapp_phone}.")
+
     return redirect("admin_panel:dashboard")
 
 
@@ -91,4 +86,6 @@ def regenerate_invitation(request, seller_id):
     _invitation, raw_token = generate_invitation(seller=seller)
     activation_url = f"{settings.APP_BASE_URL.rstrip('/')}/acesso/{raw_token}/"
     queue_invitation(seller=seller, activation_url=activation_url)
+
+    messages.success(request, f"Novo convite enviado para {seller.whatsapp_phone}.")
     return redirect("admin_panel:dashboard")

@@ -35,11 +35,15 @@ def activate_invitation(request, token):
 
     # Migrate session data to current request session
     from django.contrib.sessions.backends.db import SessionStore
+    from django.contrib.sessions.models import Session
 
     store = SessionStore(session_key=seller_session.django_session_key)
     request.session.update(dict(store))
     request.session["seller_id"] = str(seller_session.seller_id)
     request.session.save()
+
+    seller_session.django_session_key = request.session.session_key
+    seller_session.save(update_fields=["django_session_key"])
 
     response = redirect("/app/")
     response["Referrer-Policy"] = "no-referrer"
