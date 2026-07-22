@@ -39,7 +39,10 @@ def activate_invitation(request, token):
     session_days = getattr(settings, "SELLER_SESSION_DAYS", 30)
 
     request.session["seller_id"] = str(seller.id)
-    request.session.save()
+    if request.session.session_key is None:
+        request.session.create()
+    else:
+        request.session.modified = True
 
     SellerSession.objects.create(
         seller=seller,
