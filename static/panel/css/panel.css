@@ -352,6 +352,66 @@ body { background: var(--vidalys-surface, #F5F8FF); color: var(--color-gray-950,
 .panel-config-list li         { font-size: .8125rem; color: var(--color-gray-700); padding: var(--space-2) 0; }
 .panel-config-list code       { background: var(--color-gray-100); padding: 1px 6px; border-radius: 4px; font-size: .75rem; color: var(--vidalys-blue); }
 
+/* ── Dashboard v3 ──────────────────────────────────────────────────────── */
+.panel-dashboard              { }
+
+.panel-dashboard-hero {
+    display: flex; align-items: center; gap: var(--space-4); text-decoration: none;
+    background: #fff; border-radius: var(--radius-lg); padding: var(--space-5);
+    box-shadow: 0 1px 3px rgba(7,27,74,.04); margin-bottom: var(--space-4);
+    transition: box-shadow .15s, border-color .15s;
+    border: 1.5px solid transparent;
+}
+.panel-dashboard-hero:hover  { border-color: var(--vidalys-blue); box-shadow: 0 4px 16px rgba(37,99,255,.08); }
+.panel-dashboard-hero__icon  { width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(37,99,255,.08); color: var(--vidalys-blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.panel-dashboard-hero__text  { flex: 1; min-width: 0; }
+.panel-dashboard-hero__text h2 { font-size: var(--text-lg); font-weight: 600; color: var(--vidalys-navy); }
+.panel-dashboard-hero__text p { font-size: .8125rem; color: var(--color-gray-500); margin-top: 2px; }
+.panel-dashboard-hero__arrow { flex-shrink: 0; color: var(--color-gray-400); }
+
+.panel-dashboard-stats {
+    display: flex; gap: var(--space-3); margin-bottom: var(--space-5);
+}
+.panel-dashboard-stat {
+    flex: 1; background: #fff; border-radius: var(--radius-md); padding: var(--space-4);
+    box-shadow: 0 1px 3px rgba(7,27,74,.04); text-align: center;
+}
+.panel-dashboard-stat__value { display: block; font-size: 1.5rem; font-weight: 700; color: var(--vidalys-navy); font-variant-numeric: tabular-nums; }
+.panel-dashboard-stat__label { display: block; font-size: .75rem; color: var(--color-gray-500); margin-top: 2px; }
+
+.panel-dashboard-sections    { display: flex; gap: var(--space-5); flex-direction: column; }
+@media (min-width: 1024px)   { .panel-dashboard-sections { flex-direction: row; } }
+.panel-dashboard-sections__main { flex: 1; min-width: 0; }
+.panel-dashboard-sections__side { width: 100%; }
+@media (min-width: 1024px)   { .panel-dashboard-sections__side { width: 280px; flex-shrink: 0; } }
+
+/* Dashboard seller rows */
+.panel-dashboard-sellers     { }
+.panel-dashboard-seller {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-3); border-bottom: 1px solid var(--color-gray-100);
+}
+.panel-dashboard-seller:last-child { border-bottom: none; }
+.panel-dashboard-seller__avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--vidalys-blue), var(--vidalys-cyan));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 700; flex-shrink: 0;
+}
+.panel-dashboard-seller__info { flex: 1; min-width: 0; }
+.panel-dashboard-seller__name { display: block; font-size: .875rem; font-weight: 500; color: var(--vidalys-navy); }
+.panel-dashboard-seller__phone { display: block; font-size: .75rem; color: var(--color-gray-500); }
+
+/* Dashboard shortcuts */
+.panel-dashboard-shortcuts   { display: flex; flex-direction: column; gap: var(--space-1); }
+.panel-dashboard-shortcut {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+    font-size: .8125rem; font-weight: 500; color: var(--color-gray-700);
+    text-decoration: none; transition: all .15s;
+}
+.panel-dashboard-shortcut:hover { background: var(--color-gray-50); color: var(--vidalys-blue); }
+
 /* ── Seller searchable dropdown ─────────────────────────────────────────── */
 .panel-seller-search          { position: relative; }
 .panel-seller-search__results { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: #fff; border: 1px solid var(--color-gray-200); border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(7,27,74,.12); max-height: 280px; overflow-y: auto; margin-top: 4px; }
