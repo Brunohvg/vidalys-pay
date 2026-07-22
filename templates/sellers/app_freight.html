@@ -10,6 +10,7 @@
 
 {% block content %}
 <div class="freight-page">
+    {% csrf_token %}
     <div class="freight-header">
         <h1 class="freight-header__title">Calcular frete</h1>
         <p class="freight-header__desc">Consulte o endereço e veja as opções disponíveis.</p>
@@ -215,6 +216,30 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentStep = 1;
     let errorRetryAction = null;
 
+    function getCsrfToken() {
+        var input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input && input.value) {
+            return input.value;
+        }
+        var cookies = document.cookie ? document.cookie.split(';') : [];
+        for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.indexOf('csrftoken=') === 0) {
+                return decodeURIComponent(c.substring('csrftoken='.length));
+            }
+        }
+        return null;
+    }
+
+    function buildFetchHeaders() {
+        var headers = { 'Content-Type': 'application/json' };
+        var token = getCsrfToken();
+        if (token) {
+            headers['X-CSRFToken'] = token;
+        }
+        return headers;
+    }
+
     function updateProgress(step) {
         currentStep = step;
         var pct = step === 1 ? 0 : (step === 2 ? 50 : 100);
@@ -265,10 +290,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var resp = await fetch('/api/v1/freight/cep/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
+                headers: buildFetchHeaders(),
+                credentials: 'same-origin',
                 body: JSON.stringify({ zip_code: cep }),
             });
 
@@ -280,8 +303,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (resp.status === 401 || resp.status === 403) {
-                showError('Sua sessão expirou. Atualize a página para continuar.',
+            if (resp.status === 401) {
+                showError('Sua sessão expirou. Entre novamente.',
+                    function() { window.location.reload(); }, 'session_expired');
+                return;
+            }
+
+            if (resp.status === 403) {
+                showError('Não foi possível validar sua sessão. Atualize a página.',
                     function() { window.location.reload(); }, 'session_expired');
                 return;
             }
@@ -296,8 +325,13 @@ document.addEventListener('DOMContentLoaded', function() {
             var msg = (data.error && data.error.message) ? data.error.message : 'Não foi possível consultar o endereço. Tente novamente.';
             showError(msg, lookupCep, 'api_error');
             currentAddress = null;
-        } catch {
-            showError('Erro de conexão. Verifique sua internet e tente novamente.', lookupCep, 'connection_error');
+        } catch (err) {
+            console.error('CEP lookup failed:', err);
+            if (!navigator.onLine) {
+                showError('Sem conexão com o servidor. Verifique sua internet.', lookupCep, 'connection_error');
+            } else {
+                showError('Não foi possível consultar o endereço. Tente novamente.', lookupCep, 'api_error');
+            }
             currentAddress = null;
         } finally {
             setCepLoading(false);
@@ -445,10 +479,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var response = await fetch('/api/v1/freight/calculate/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
+                headers: buildFetchHeaders(),
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     destination_zip_code: cep,
                     weight_grams: weight,
@@ -464,8 +496,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 lastResult = data.data;
                 showResults(data.data);
-            } else if (response.status === 401 || response.status === 403) {
-                showError('Sua sessão expirou. Atualize a página para continuar.',
+            } else if (response.status === 401) {
+                showError('Sua sessão expirou. Entre novamente.',
+                    function() { window.location.reload(); }, 'session_expired');
+            } else if (response.status === 403) {
+                showError('Não foi possível validar sua sessão. Atualize a página.',
                     function() { window.location.reload(); }, 'session_expired');
             } else if (response.status === 502 || response.status === 503) {
                 showError('Os Correios estão temporariamente indisponíveis. Tente novamente em alguns instantes.',
@@ -482,12 +517,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         } catch (err) {
+            console.error('Freight calculate failed:', err);
             if (!navigator.onLine) {
-                showError('Sem conexão com a internet. Verifique sua rede e tente novamente.',
+                showError('Sem conexão com o servidor. Verifique sua internet.',
                     calculateFreight, 'connection_error');
             } else {
-                showError('Erro de conexão. Verifique sua internet e tente novamente.',
-                    calculateFreight, 'connection_error');
+                showError('Não foi possível calcular o frete. Tente novamente.',
+                    calculateFreight, 'api_error');
             }
         } finally {
             calculateBtn.classList.remove('loading');
