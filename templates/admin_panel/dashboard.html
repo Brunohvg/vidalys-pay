@@ -19,8 +19,9 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="whatsapp">WhatsApp</label>
-                <input type="tel" id="whatsapp" name="whatsapp" class="form-input" placeholder="+5511999999999" required autocomplete="off">
+                <label class="form-label" for="whatsapp_display">WhatsApp</label>
+                <input type="tel" id="whatsapp_display" class="form-input" placeholder="(11) 99999-9999" required autocomplete="off" maxlength="20">
+                <input type="hidden" id="whatsapp" name="whatsapp">
                 <div class="form-hint">O link de acesso será enviado automaticamente para este número.</div>
             </div>
 
@@ -93,4 +94,45 @@
         </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var display = document.getElementById('whatsapp_display');
+    var hidden = document.getElementById('whatsapp');
+    if (!display || !hidden) return;
+
+    display.addEventListener('input', function() {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length > 11) raw = raw.slice(0, 11);
+
+        var formatted = '';
+        if (raw.length > 0) {
+            formatted = '(' + raw.slice(0, 2);
+            if (raw.length > 2) {
+                formatted += ') ' + (raw.length > 7 ? raw.slice(2, 7) + '-' + raw.slice(7) : raw.slice(2));
+            }
+        }
+        this.value = formatted;
+        hidden.value = raw.length === 11 ? '+55' + raw : '';
+    });
+
+    display.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace' && this.selectionStart === 0 && this.selectionEnd === 0) {
+            return;
+        }
+    });
+
+    display.addEventListener('blur', function() {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length > 0 && raw.length < 11) {
+            this.style.borderColor = 'var(--color-danger)';
+            hidden.value = '';
+        } else {
+            this.style.borderColor = '';
+        }
+    });
+})();
+</script>
 {% endblock %}
