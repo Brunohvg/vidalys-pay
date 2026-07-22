@@ -72,6 +72,7 @@
                 {% endif %}
 
                 <div class="seller-card__actions">
+                    <a href="{% url 'admin_panel:create_link' seller_id=item.seller.id %}" class="seller-card__action seller-card__action--primary" style="text-decoration:none;">Criar Link</a>
                     <form method="post" action="{% url 'admin_panel:regenerate_invitation' seller_id=item.seller.id %}" style="flex:1;display:flex;">
                         {% csrf_token %}
                         <button type="submit" class="seller-card__action seller-card__action--whatsapp">Reenviar</button>

@@ -11,4 +11,5 @@ urlpatterns = [
     path("<uuid:seller_id>/convidar/", views.regenerate_invitation, name="regenerate_invitation"),
     path("<uuid:seller_id>/revogar-convite/", views.revoke_invitation, name="revoke_invitation"),
     path("<uuid:seller_id>/excluir/", views.delete_seller, name="delete_seller"),
+    path("<uuid:seller_id>/criar-link/", views.create_link, name="create_link"),
 ]

@@ -1,7 +1,7 @@
-"""Pagar.me HTTP client — V5 API integration.
+"""Pagar.me HTTP gateway — V5 API integration.
 
-Authentication: Basic Auth with Secret Key as username, empty password.
-Uses the credential normalizer to accept multiple input formats safely.
+Centralized client with proper auth header construction,
+diagnostic logging, and no double-encoding.
 """
 import logging
 from typing import Any
@@ -13,29 +13,42 @@ from .credentials import (
     PagarMeConfigurationError,
     build_basic_auth_header,
     get_pagarme_api_key,
+    normalize_pagarme_api_key,
 )
 
 logger = logging.getLogger("apps.integrations.pagarme")
 
 
 class PagarmeError(Exception):
+    """Pagar.me API error with status code and response data."""
+
     def __init__(self, status_code: int, error_data: dict):
         self.status_code = status_code
         self.error_data = error_data
         super().__init__(f"Pagar.me error {status_code}: {error_data}")
 
 
-class PagarmeClient:
-    """HTTP client for Pagar.me V5 API."""
+class PagarMeGateway:
+    """HTTP gateway for Pagar.me V5 API.
 
-    def __init__(self):
-        self.base_url = settings.PAGARME_BASE_URL.rstrip("/")
-        self.api_key = get_pagarme_api_key()
+    Handles credential normalization, Basic Auth header construction,
+    and diagnostic logging for authentication failures.
+    """
+
+    BASE_URL = "https://api.pagar.me/core/v5"
+
+    def __init__(self, api_key: str | None = None):
+        self.api_key = normalize_pagarme_api_key(
+            api_key or get_pagarme_api_key()
+        )
 
         if not self.api_key:
             raise PagarMeConfigurationError(
                 "Credencial da Pagar.me nao configurada."
             )
+
+        configured_base = getattr(settings, "PAGARME_BASE_URL", "") or ""
+        self.base_url = (configured_base or self.BASE_URL).rstrip("/")
 
         self._timeout = httpx.Timeout(
             connect=getattr(settings, "PAGARME_CONNECT_TIMEOUT_SECONDS", 5),
@@ -44,25 +57,44 @@ class PagarmeClient:
             pool=5,
         )
 
-    def _headers(self) -> dict:
+    @property
+    def payment_links_url(self) -> str:
+        return f"{self.base_url}/paymentlinks"
+
+    def _get_headers(self) -> dict:
         return {
             "Accept": "application/json",
             "Content-Type": "application/json",
             "Authorization": build_basic_auth_header(self.api_key),
         }
 
-    def _post(self, path: str, json: dict) -> dict[str, Any]:
-        url = f"{self.base_url}/{path.lstrip('/')}"
-        headers = self._headers()
-        _log_request_diagnostics("POST", url, headers)
-        response = httpx.post(url, json=json, headers=headers, timeout=self._timeout)
-        return self._handle_response(response)
+    def _request(
+        self,
+        method: str,
+        url: str,
+        **kwargs,
+    ) -> dict[str, Any]:
+        headers = self._get_headers()
 
-    def _get(self, path: str) -> dict[str, Any]:
-        url = f"{self.base_url}/{path.lstrip('/')}"
-        headers = self._headers()
-        _log_request_diagnostics("GET", url, headers)
-        response = httpx.get(url, headers=headers, timeout=self._timeout)
+        extra_headers = kwargs.pop("headers", {}) or {}
+
+        if any(k.lower() == "authorization" for k in extra_headers):
+            raise PagarMeConfigurationError(
+                "O header Authorization nao pode ser sobrescrito."
+            )
+
+        headers.update(extra_headers)
+
+        _log_request_diagnostics(method, url, headers)
+
+        response = httpx.request(
+            method,
+            url,
+            headers=headers,
+            timeout=kwargs.pop("timeout", self._timeout),
+            **kwargs,
+        )
+
         return self._handle_response(response)
 
     def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
@@ -91,7 +123,11 @@ class PagarmeClient:
                 response.headers.get("x-request-id", ""),
             )
         else:
-            logger.error("Pagar.me HTTP %d: %s", response.status_code, error_data)
+            logger.error(
+                "Pagar.me HTTP %d: %s",
+                response.status_code,
+                error_data,
+            )
 
         raise PagarmeError(response.status_code, error_data)
 
@@ -144,33 +180,29 @@ class PagarmeClient:
 
         logger.info(
             "Criando link Pagar.me: ref=%s amount=%d installments=%d",
-            reference, amount_cents, installments,
+            reference,
+            amount_cents,
+            installments,
         )
 
-        data = self._post("paymentlinks", payload)
+        data = self._request("POST", self.payment_links_url, json=payload)
 
         logger.info(
             "Link criado: id=%s status=%s",
-            data.get("id"), data.get("status"),
+            data.get("id"),
+            data.get("status"),
         )
         return data
 
     def get_payment_link(self, link_id: str) -> dict[str, Any]:
-        return self._get(f"paymentlinks/{link_id}")
+        url = f"{self.base_url}/paymentlinks/{link_id}"
+        return self._request("GET", url)
 
     def cancel_payment_link(self, link_id: str) -> dict[str, Any]:
         url = f"{self.base_url}/paymentlinks/{link_id}"
-        response = httpx.patch(
-            url,
-            json={"is_building": True},
-            headers=self._headers(),
-            timeout=self._timeout,
+        return self._request(
+            "PATCH", url, json={"is_building": True}
         )
-        return self._handle_response(response)
-
-
-def get_client() -> PagarmeClient:
-    return PagarmeClient()
 
 
 def _log_request_diagnostics(method: str, url: str, headers: dict) -> None:
@@ -191,10 +223,10 @@ def _log_request_diagnostics(method: str, url: str, headers: dict) -> None:
 def _log_401_diagnostics(response: httpx.Response) -> None:
     auth_sent = False
     is_basic = False
-    req = getattr(response, "request", None)
-    if req is not None:
-        req_headers = getattr(req, "headers", {}) or {}
-        auth_header = req_headers.get("authorization", "")
+    request_headers = getattr(response, "request", None)
+    if request_headers is not None:
+        request_headers = getattr(request_headers, "headers", {})
+        auth_header = request_headers.get("authorization", "")
         auth_sent = bool(auth_header)
         is_basic = auth_header.startswith("Basic ")
 
@@ -221,3 +253,7 @@ def _safe_endpoint(url: str) -> str:
         if part and not part.startswith("http"):
             return f"/{part}"
     return url
+
+
+def get_gateway() -> PagarMeGateway:
+    return PagarMeGateway()

@@ -2,7 +2,11 @@
 import httpx
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.integrations.pagarme.credentials import CredentialError, get_credential
+from apps.integrations.pagarme.credentials import (
+    PagarMeConfigurationError,
+    build_basic_auth_header,
+    get_pagarme_api_key,
+)
 
 
 class Command(BaseCommand):
@@ -10,37 +14,54 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            cred = get_credential()
-        except CredentialError as e:
-            raise CommandError(f"Credencial inválida: {e}") from e
+            api_key = get_pagarme_api_key()
+        except PagarMeConfigurationError as e:
+            raise CommandError(f"Credencial invalida: {e}") from e
 
         from django.conf import settings
 
+        auth_header = build_basic_auth_header(api_key)
+
         self.stdout.write(f"Credencial configurada:        sim")
-        self.stdout.write(f"Formato de entrada detectado:  {cred.source_format}")
-        self.stdout.write(f"Ambiente detectado:            {cred.environment}")
-        self.stdout.write(f"Base URL:                      {settings.PAGARME_BASE_URL}")
+        self.stdout.write(f"Formato de entrada detectado:  {_detect_input_format_from_settings()}")
+        self.stdout.write(f"Ambiente detectado:            {'production' if not api_key.startswith('sk_test_') else 'test'}")
+        self.stdout.write(f"Authorization presente:         sim")
+        self.stdout.write(f"Authorization schema:           Basic")
+        self.stdout.write(f"Endpoint:                       {settings.PAGARME_BASE_URL.rstrip('/')}/paymentlinks")
         self.stdout.write("")
 
         try:
             response = httpx.get(
                 f"{settings.PAGARME_BASE_URL.rstrip('/')}/paymentlinks",
-                headers={"Authorization": cred.authorization_header, "Accept": "application/json"},
+                headers={"Authorization": auth_header, "Accept": "application/json"},
                 timeout=httpx.Timeout(connect=5, read=10),
             )
         except httpx.ConnectError:
-            raise CommandError("Falha de conexão: não foi possível alcançar a API Pagar.me.")
+            raise CommandError("Falha de conexao: nao foi possivel alcancar a API Pagar.me.")
         except httpx.TimeoutException:
-            raise CommandError("Timeout: a API Pagar.me não respondeu a tempo.")
+            raise CommandError("Timeout: a API Pagar.me nao respondeu a tempo.")
 
         if response.status_code == 401:
             raise CommandError(
-                "HTTP 401: autenticação recusada. Verifique se a credencial representa "
-                "uma Secret Key válida e se não houve dupla conversão para Basic Auth."
+                "HTTP 401: autenticacao recusada. Verifique se a credencial representa "
+                "uma Secret Key valida e se nao houve dupla conversao para Basic Auth."
             )
         elif response.status_code == 403:
-            raise CommandError("HTTP 403: acesso negado. Verifique permissões da conta.")
+            raise CommandError("HTTP 403: acesso negado. Verifique permissoes da conta.")
         elif response.status_code >= 400:
             raise CommandError(f"HTTP {response.status_code}: erro ao acessar a API.")
 
-        self.stdout.write(self.style.SUCCESS("API Pagar.me acessível. Autenticação OK."))
+        self.stdout.write(self.style.SUCCESS("API Pagar.me acessivel. Autenticacao OK."))
+
+
+def _detect_input_format_from_settings() -> str:
+    from django.conf import settings
+
+    from apps.integrations.pagarme.credentials import _detect_input_format
+
+    credential = getattr(settings, "PAGARME_CREDENTIAL", "") or ""
+    if credential:
+        return _detect_input_format(credential)
+
+    legacy_key = getattr(settings, "PAGARME_SECRET_KEY", "") or ""
+    return _detect_input_format(legacy_key)

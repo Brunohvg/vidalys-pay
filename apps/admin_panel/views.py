@@ -1,3 +1,6 @@
+import uuid
+from datetime import date
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -6,7 +9,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.notifications.whatsapp_service import queue_invitation
+from apps.notifications.whatsapp_service import (
+    queue_invitation,
+    queue_payment_link_created,
+)
+from apps.payment_links.use_cases import create_payment_link
 from apps.sellers.models import Seller, SellerInvitation
 from apps.sellers.services import generate_invitation
 
@@ -116,3 +123,83 @@ def delete_seller(request, seller_id):
     seller.delete()
     messages.success(request, f"Vendedor '{name}' excluído permanentemente.")
     return redirect("admin_panel:dashboard")
+
+
+@admin_required
+def create_link(request, seller_id):
+    seller = get_object_or_404(Seller, id=seller_id)
+
+    if request.method == "POST":
+        return _handle_create_link_post(request, seller)
+
+    return render(request, "admin_panel/create_link.html", {
+        "seller": seller,
+    })
+
+
+def _handle_create_link_post(request, seller):
+    amount_display = request.POST.get("amount_display", "").strip()
+    installments = request.POST.get("installments", "1").strip()
+    customer_name = request.POST.get("customer_name", "").strip() or None
+    customer_phone = request.POST.get("customer_phone", "").strip() or None
+
+    try:
+        clean = amount_display.replace(".", "").replace(",", ".")
+        amount_cents = int(float(clean) * 100)
+    except (ValueError, TypeError):
+        return render(request, "admin_panel/create_link.html", {
+            "seller": seller,
+            "error": "Informe um valor válido.",
+            "form_data": {
+                "amount_display": amount_display,
+                "installments": int(installments),
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+            },
+        })
+
+    try:
+        installments = int(installments)
+    except (ValueError, TypeError):
+        installments = 1
+
+    today = date.today()
+    ref_suffix = uuid.uuid4().hex[:4].upper()
+    reference = f"{today.strftime('%Y%m%d')}-{ref_suffix}"
+
+    idempotency_key = str(uuid.uuid4())
+
+    result = create_payment_link(
+        seller=seller,
+        reference=reference,
+        amount_cents=amount_cents,
+        installments=installments,
+        idempotency_key=idempotency_key,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+    )
+
+    if not result.success:
+        return render(request, "admin_panel/create_link.html", {
+            "seller": seller,
+            "error": result.error_message,
+            "form_data": {
+                "amount_display": amount_display,
+                "installments": installments,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+            },
+        })
+
+    payment_link = result.payment_link
+    whatsapp_status = None
+    if payment_link.payment_url:
+        queue_payment_link_created(seller=seller, payment_link=payment_link)
+        whatsapp_status = "ENVIADO"
+
+    return render(request, "admin_panel/create_link.html", {
+        "seller": seller,
+        "success": True,
+        "payment_link": payment_link,
+        "whatsapp_status": whatsapp_status,
+    })
