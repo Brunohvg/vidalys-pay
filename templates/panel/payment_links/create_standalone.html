@@ -60,15 +60,21 @@
 
             <div class="panel-card">
                 <div class="panel-field">
-                    <label class="panel-field__label" for="seller">Vendedor responsável</label>
-                    <select id="seller" name="seller_id" class="panel-field__select" required>
-                        <option value="">Selecione um vendedor…</option>
-                        {% for s in sellers %}
-                        <option value="{{ s.id }}" {% if selected_seller_id == s.id|stringformat:'s' %}selected{% endif %}>
-                            {{ s.name }} — {{ s.whatsapp_phone }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                    <label class="panel-field__label" for="sellerSearch">Vendedor responsável</label>
+                    <div class="panel-seller-search">
+                        <input type="text" id="sellerSearch" class="panel-field__input" placeholder="Buscar vendedor por nome ou telefone…" autocomplete="off">
+                        <div class="panel-seller-search__results" id="sellerResults">
+                            {% for s in sellers %}
+                            <button type="button" class="panel-seller-search__item" data-id="{{ s.id }}"
+                                    data-name="{{ s.name|escapejs }}" data-phone="{{ s.whatsapp_phone|escapejs }}"
+                                    data-limit="{{ s.max_payment_amount_cents }}">
+                                <span class="panel-seller-search__item-name">{{ s.name }}</span>
+                                <span class="panel-seller-search__item-phone">{{ s.whatsapp_phone }}</span>
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <input type="hidden" id="seller" name="seller_id" value="{{ selected_seller_id|default:'' }}">
                 </div>
 
                 <div id="sellerSummary" class="panel-seller-summary" style="display:none;">
@@ -148,7 +154,9 @@
 <script>
 var sellersData = {{ sellers_json|safe }};
 
-var sellerSelect = document.getElementById('seller');
+var sellerInput = document.getElementById('seller');
+var sellerSearch = document.getElementById('sellerSearch');
+var sellerResults = document.getElementById('sellerResults');
 var sellerSummary = document.getElementById('sellerSummary');
 var summaryName = document.getElementById('sellerSummaryName');
 var summaryPhone = document.getElementById('sellerSummaryPhone');
@@ -156,28 +164,68 @@ var summaryStatus = document.getElementById('sellerSummaryStatus');
 var summaryLimit = document.getElementById('sellerSummaryLimit');
 var sellerAvatar = document.getElementById('sellerAvatar');
 
-function updateSellerSummary() {
-    var id = sellerSelect.value;
-    if (!id) { sellerSummary.style.display = 'none'; return; }
-    sellerSummary.style.display = 'flex';
-    for (var i = 0; i < sellersData.length; i++) {
-        if (sellersData[i].id === id) {
-            var s = sellersData[i];
-            summaryName.textContent = s.name;
-            summaryPhone.textContent = s.whatsapp_phone;
-            summaryStatus.textContent = 'Ativo';
-            summaryStatus.className = 'panel-badge panel-badge--active';
-            summaryLimit.textContent = 'Limite: ' + s.limit_formatted;
-            sellerAvatar.textContent = s.name.substring(0, 2).toUpperCase();
-            break;
-        }
+// Searchable dropdown
+sellerSearch.addEventListener('focus', function() {
+    sellerResults.classList.add('open');
+    filterResults(this.value);
+});
+
+sellerSearch.addEventListener('input', function() {
+    sellerResults.classList.add('open');
+    filterResults(this.value);
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.panel-seller-search')) {
+        sellerResults.classList.remove('open');
     }
-    updatePaymentSummary();
+});
+
+function filterResults(query) {
+    var q = (query || '').toLowerCase();
+    var items = sellerResults.querySelectorAll('.panel-seller-search__item');
+    var anyVisible = false;
+    items.forEach(function(item) {
+        var name = (item.getAttribute('data-name') || '').toLowerCase();
+        var phone = (item.getAttribute('data-phone') || '').toLowerCase();
+        if (!q || name.indexOf(q) !== -1 || phone.indexOf(q) !== -1) {
+            item.style.display = '';
+            anyVisible = true;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    if (!anyVisible && q) {
+        sellerResults.classList.add('open');
+    }
 }
+
+sellerResults.querySelectorAll('.panel-seller-search__item').forEach(function(item) {
+    item.addEventListener('click', function() {
+        sellerInput.value = this.getAttribute('data-id');
+        sellerSearch.value = this.getAttribute('data-name') + ' — ' + this.getAttribute('data-phone');
+        sellerResults.classList.remove('open');
+
+        // Update summary
+        sellerSummary.style.display = 'flex';
+        summaryName.textContent = this.getAttribute('data-name');
+        summaryPhone.textContent = this.getAttribute('data-phone');
+        summaryStatus.textContent = 'Ativo';
+        summaryStatus.className = 'panel-badge panel-badge--active';
+        summaryLimit.textContent = 'Limite: R$ ' + (parseInt(this.getAttribute('data-limit')) / 100).toLocaleString('pt-BR', {minimumFractionDigits:2});
+        sellerAvatar.textContent = this.getAttribute('data-name').substring(0, 2).toUpperCase();
+
+        // Mark selected
+        sellerResults.querySelectorAll('.panel-seller-search__item').forEach(function(i) { i.classList.remove('selected'); });
+        this.classList.add('selected');
+
+        updatePaymentSummary();
+    });
+});
 
 function updatePaymentSummary() {
     var summary = document.getElementById('paymentSummary');
-    var id = sellerSelect.value;
+    var id = sellerInput.value;
     var amount = document.getElementById('amount').value;
     var installments = document.getElementById('installments').value;
 
@@ -196,8 +244,6 @@ function updatePaymentSummary() {
         '<div class="panel-summary__row"><span>Valor</span><span style="color:var(--vidalys-green);font-weight:700;">R$ ' + amount + '</span></div>' +
         '<div class="panel-summary__row"><span>Parcelas</span><span>' + installments + 'x sem juros</span></div>';
 }
-
-sellerSelect.addEventListener('change', updateSellerSummary);
 
 var amountInput = document.getElementById('amount');
 amountInput.addEventListener('input', function(e) {
@@ -225,7 +271,13 @@ form.addEventListener('submit', function() {
 });
 
 {% if selected_seller_id %}
-updateSellerSummary();
+(function() {
+    var preselect = sellerResults.querySelector('[data-id="{{ selected_seller_id }}"]');
+    if (preselect) {
+        preselect.click();
+        sellerSearch.value = preselect.getAttribute('data-name') + ' — ' + preselect.getAttribute('data-phone');
+    }
+})();
 {% endif %}
 </script>
 {% endif %}
