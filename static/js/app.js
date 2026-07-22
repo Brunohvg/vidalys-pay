@@ -3,10 +3,11 @@
     'use strict';
 
     var splash = document.getElementById('appSplash');
+    var splashStartedAt = performance.now();
     var firstOpen = false;
     try {
-        firstOpen = !sessionStorage.getItem('vidalys-app-ready');
-        if (firstOpen) sessionStorage.setItem('vidalys-app-ready', '1');
+        firstOpen = !sessionStorage.getItem('vidalys-app-ready-v5');
+        if (firstOpen) sessionStorage.setItem('vidalys-app-ready-v5', '1');
     } catch (_) {}
 
     function revealApp() {
@@ -20,9 +21,10 @@
     if (splash && firstOpen) {
         splash.classList.add('app-splash--visible');
         window.addEventListener('load', function () {
-            window.setTimeout(revealApp, 260);
+            var elapsed = performance.now() - splashStartedAt;
+            window.setTimeout(revealApp, Math.max(0, 900 - elapsed));
         }, { once: true });
-        window.setTimeout(revealApp, 900);
+        window.setTimeout(revealApp, 1800);
     } else {
         if (splash) splash.remove();
         requestAnimationFrame(function () { document.body.classList.add('app-ready'); });
