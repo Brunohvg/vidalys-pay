@@ -191,3 +191,9 @@ def _mask_phone(phone: str) -> str:
     if len(phone) <= 7:
         return phone
     return phone[:5] + "*" * (len(phone) - 8) + phone[-3:]
+
+
+@require_GET
+def index(request):
+    """Redireciona raiz para a página principal do app."""
+    return redirect("sellers:app_new_link")

@@ -6,6 +6,8 @@ from . import views
 app_name = "sellers"
 
 urlpatterns = [
+    # Root
+    path("", views.index, name="index"),
     # Activation
     path("acesso/<str:token>/", views.activate_invitation, name="activate"),
     # App pages
