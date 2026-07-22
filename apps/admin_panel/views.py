@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.notifications.whatsapp_service import queue_invitation
 from apps.sellers.models import Seller, SellerInvitation
 from apps.sellers.services import generate_invitation
 
@@ -66,7 +67,10 @@ def create_seller(request):
             max_payment_amount_cents=max_amount_cents,
             is_active=True,
         )
-        generate_invitation(seller=seller)
+        _invitation, raw_token = generate_invitation(seller=seller)
+
+    activation_url = f"{settings.APP_BASE_URL.rstrip('/')}/acesso/{raw_token}/"
+    queue_invitation(seller=seller, activation_url=activation_url)
 
     return redirect("admin_panel:dashboard")
 
@@ -84,5 +88,7 @@ def toggle_seller(request, seller_id):
 @require_POST
 def regenerate_invitation(request, seller_id):
     seller = get_object_or_404(Seller, id=seller_id)
-    generate_invitation(seller=seller)
+    _invitation, raw_token = generate_invitation(seller=seller)
+    activation_url = f"{settings.APP_BASE_URL.rstrip('/')}/acesso/{raw_token}/"
+    queue_invitation(seller=seller, activation_url=activation_url)
     return redirect("admin_panel:dashboard")

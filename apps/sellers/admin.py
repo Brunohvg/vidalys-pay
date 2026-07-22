@@ -1,15 +1,12 @@
 """Seller admin with actions."""
-import logging
-
 from django.contrib import admin, messages
 from django.utils import timezone
 
 from apps.core.admin import TimeStampedModelAdmin
+from apps.notifications.whatsapp_service import queue_invitation
 
 from .models import Seller, SellerInvitation, SellerSession
 from .services import generate_invitation, revoke_all_sessions
-
-logger = logging.getLogger("apps.sellers")
 
 
 @admin.register(Seller)
@@ -28,10 +25,9 @@ class SellerAdmin(TimeStampedModelAdmin):
 
             invitation, raw_token = generate_invitation(seller=seller, created_by=request.user)
 
-            # TODO: Enqueue WhatsApp message via outbox (Fase 5)
-            logger.info("Convite gerado para %s: token=%s", seller.name, raw_token[:8] + "...")
-
             activation_url = f"{request.build_absolute_uri('/acesso/')}{raw_token}"
+            queue_invitation(seller=seller, activation_url=activation_url)
+
             self.message_user(
                 request,
                 f"Convite gerado para {seller.name}. URL: {activation_url}",
@@ -44,10 +40,9 @@ class SellerAdmin(TimeStampedModelAdmin):
             count = revoke_all_sessions(seller=seller)
             invitation, raw_token = generate_invitation(seller=seller, created_by=request.user)
 
-            # TODO: Enqueue WhatsApp message via outbox (Fase 5)
-            logger.info("Acessos revogados (%d) e convite gerado para %s", count, seller.name)
-
             activation_url = f"{request.build_absolute_uri('/acesso/')}{raw_token}"
+            queue_invitation(seller=seller, activation_url=activation_url)
+
             self.message_user(
                 request,
                 f"{count} sessões revogadas para {seller.name}. Novo convite: {activation_url}",
