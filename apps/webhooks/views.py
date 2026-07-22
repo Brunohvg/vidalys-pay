@@ -1,9 +1,11 @@
 """Webhook receiver views — Pagar.me webhook endpoint."""
 import hashlib
+import hmac
 import json
 import logging
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -13,7 +15,7 @@ from .processor import process_webhook_event
 
 logger = logging.getLogger("apps.webhooks")
 
-MAX_BODY_SIZE = 1_048_576  # 1MB
+MAX_BODY_SIZE = getattr(settings, "PAGARME_WEBHOOK_MAX_BODY_BYTES", 1_048_576)
 
 
 @csrf_exempt
@@ -21,127 +23,106 @@ MAX_BODY_SIZE = 1_048_576  # 1MB
 def pagarme_webhook(request):
     """Receive Pagar.me webhook events.
 
-    Authentication: Basic Auth with PAGARME_WEBHOOK_BASIC_AUTH_USER as username.
+    Persists the event immediately, then processes asynchronously via on_commit.
     """
-    # Validate Content-Type
     content_type = request.content_type or ""
     if "application/json" not in content_type:
-        logger.warning("Content-Type inválido: %s", content_type)
-        return JsonResponse(
-            {"error": "Content-Type must be application/json"},
-            status=400,
-        )
+        logger.warning("Webhook rejeitado: Content-Type=%s", content_type)
+        return JsonResponse({"error": "Content-Type must be application/json"}, status=400)
 
-    # Validate body size
     body = request.body
     if len(body) > MAX_BODY_SIZE:
-        logger.warning("Body excede tamanho máximo: %d bytes", len(body))
-        return JsonResponse(
-            {"error": "Payload too large"},
-            status=400,
-        )
+        logger.warning("Webhook rejeitado: body=%d bytes excede limite", len(body))
+        return JsonResponse({"error": "Payload too large"}, status=400)
 
-    # Parse JSON
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError as e:
-        logger.warning("JSON inválido: %s", e)
-        return JsonResponse(
-            {"error": "Invalid JSON"},
-            status=400,
-        )
+    except json.JSONDecodeError:
+        logger.warning("Webhook rejeitado: JSON inválido")
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    # Validate Basic Auth
-    auth_valid = _validate_basic_auth(request)
+    auth_valid, auth_reason = _validate_auth(request)
     if not auth_valid:
-        logger.warning("Autenticação inválida")
-        return JsonResponse(
-            {"error": "Unauthorized"},
-            status=401,
-        )
+        logger.warning("Webhook rejeitado: autenticação inválida (%s)", auth_reason)
+        return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    # Calculate payload hash
-    payload_sha256 = hashlib.sha256(body).hexdigest()
-
-    # Extract event info
     event_id = payload.get("id", "")
     event_type = payload.get("type", "")
 
     if not event_type:
-        logger.warning("Evento sem type: %s", event_id)
-        return JsonResponse(
-            {"error": "Missing event type"},
-            status=400,
-        )
+        logger.warning("Webhook rejeitado: payload sem type")
+        return JsonResponse({"error": "Missing event type"}, status=400)
 
-    # Check for duplicate
-    existing = None
-    if event_id:
-        existing = WebhookEvent.objects.filter(provider_event_id=event_id).first()
-        if existing:
-            logger.info("Evento duplicado: %s", event_id)
-            return JsonResponse({
-                "received": True,
-                "event_id": event_id,
-                "duplicate": True,
-            })
+    payload_sha256 = hashlib.sha256(body).hexdigest()
 
-    # Extract allowed headers
     headers_summary = {
         "content_type": request.content_type,
-        "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
+        "user_agent": (request.META.get("HTTP_USER_AGENT", "") or "")[:255],
     }
 
-    # Create webhook event record
-    event = WebhookEvent.objects.create(
-        provider="pagarme",
-        provider_event_id=event_id,
-        event_type=event_type,
-        payload=payload,
-        payload_sha256=payload_sha256,
-        headers_summary=headers_summary,
-        authenticity_status="VERIFIED",
-        processing_status=ProcessingStatus.RECEIVED,
-    )
+    try:
+        event = WebhookEvent.objects.create(
+            provider="pagarme",
+            provider_event_id=event_id or None,
+            event_type=event_type,
+            payload=payload,
+            payload_sha256=payload_sha256,
+            headers_summary=headers_summary,
+            authenticity_status="VERIFIED",
+            processing_status=ProcessingStatus.RECEIVED,
+        )
+    except IntegrityError:
+        logger.info("Evento duplicado: id=%s type=%s", event_id, event_type)
+        return JsonResponse({"received": True, "event_id": event_id, "duplicate": True})
 
-    logger.info(
-        "Webhook recebido: id=%s type=%s",
-        event_id,
-        event_type,
-    )
+    logger.info("Webhook persistido: id=%s type=%s", event_id, event_type)
 
-    # Process event
-    process_webhook_event(event)
+    from django.db import transaction
+    transaction.on_commit(lambda: process_webhook_event(event))
 
-    return JsonResponse({
-        "received": True,
-        "event_id": event_id,
-        "duplicate": False,
-    })
+    return JsonResponse({"received": True, "event_id": event_id, "duplicate": False})
 
 
-def _validate_basic_auth(request) -> bool:
-    """Validate Basic Auth header.
+def _validate_auth(request) -> tuple[bool, str]:
+    """Validate webhook authentication based on configured mode."""
+    auth_mode = getattr(settings, "PAGARME_WEBHOOK_AUTH_MODE", "basic")
 
-    Pagar.me sends: Authorization: Basic base64(username:)
-    Where username is the webhook secret configured in Pagar.me dashboard.
-    """
+    if auth_mode == "none":
+        return True, "none"
+
+    if auth_mode == "basic":
+        return _validate_basic_auth(request)
+
+    logger.error("PAGARME_WEBHOOK_AUTH_MODE desconhecido: %s", auth_mode)
+    return False, f"unknown_mode:{auth_mode}"
+
+
+def _validate_basic_auth(request) -> tuple[bool, str]:
+    """Validate Basic Auth with constant-time comparison."""
     import base64
 
-    expected_user = settings.PAGARME_WEBHOOK_BASIC_AUTH_USER
+    expected_user = getattr(settings, "PAGARME_WEBHOOK_BASIC_AUTH_USER", "")
+    expected_password = getattr(settings, "PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD", "")
+
     if not expected_user:
         logger.warning("PAGARME_WEBHOOK_BASIC_AUTH_USER não configurado")
-        return False
+        return False, "not_configured"
 
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
     if not auth_header.startswith("Basic "):
-        return False
+        return False, "no_basic_header"
 
     try:
         encoded = auth_header[6:]
         decoded = base64.b64decode(encoded).decode("utf-8")
-        # Format: "username:" (password is empty)
         username, password = decoded.split(":", 1)
-        return username == expected_user and password == ""
     except Exception:
-        return False
+        return False, "decode_error"
+
+    user_valid = hmac.compare_digest(username, expected_user)
+    password_valid = hmac.compare_digest(password, expected_password)
+
+    if not user_valid or not password_valid:
+        return False, "credentials_mismatch"
+
+    return True, "ok"

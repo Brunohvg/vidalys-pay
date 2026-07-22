@@ -66,7 +66,6 @@ def queue_payment_approved(
     seller: Seller,
     payment_link,
 ) -> WhatsAppMessage:
-    """Queue payment approved message."""
     text = payment_approved_message(
         reference=payment_link.reference,
         amount_cents=payment_link.amount_cents,
@@ -88,16 +87,20 @@ def queue_payment_failed(
     *,
     seller: Seller,
     payment_link,
+    failure_reason: str = "",
+    dedup_suffix: str = "",
 ) -> WhatsAppMessage:
-    """Queue payment failed message."""
     text = payment_failed_message(
         reference=payment_link.reference,
         amount_cents=payment_link.amount_cents,
+        failure_reason=failure_reason,
     )
+
+    dedup_key_suffix = f":{dedup_suffix}" if dedup_suffix else ""
 
     return _queue_message(
         seller=seller,
-        template_key="payment_failed",
+        template_key=f"payment_failed{dedup_key_suffix}",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
@@ -136,16 +139,22 @@ def queue_payment_canceled(*, seller: Seller, payment_link) -> WhatsAppMessage:
     )
 
 
-def queue_payment_refunded(*, seller: Seller, payment_link) -> WhatsAppMessage:
-    """Queue payment refunded message."""
+def queue_payment_refunded(
+    *,
+    seller: Seller,
+    payment_link,
+    dedup_suffix: str = "",
+) -> WhatsAppMessage:
     text = payment_refunded_message(
         reference=payment_link.reference,
         amount_cents=payment_link.amount_cents,
     )
 
+    dedup_key_suffix = f":{dedup_suffix}" if dedup_suffix else ""
+
     return _queue_message(
         seller=seller,
-        template_key="payment_refunded",
+        template_key=f"payment_refunded{dedup_key_suffix}",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",

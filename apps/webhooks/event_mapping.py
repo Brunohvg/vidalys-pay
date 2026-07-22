@@ -1,9 +1,11 @@
-"""Webhook event mapping — versioned mapping table for Pagar.me events."""
+"""Webhook event mapping — versioned mapping table for Pagar.me events.
 
-# Event mapping: event_type → action config
-# Actions: mark_paid, create_attempt, update_attempt, mark_canceled, mark_refunded, ignore
+Designed for payment link use case (auth_and_capture credit card).
+Recommended webhook events to register: order.paid, order.payment_failed, charge.refunded.
+"""
+
 EVENT_MAP = {
-    # Order events
+    # Order events (primary: use these in webhook registration)
     "order.paid": {
         "action": "mark_paid",
         "link_status": "PAID",
@@ -22,17 +24,19 @@ EVENT_MAP = {
     },
     "order.created": {
         "action": "ignore",
-        "description": "Pedido criado (já tratado na criação do link)",
+        "description": "Pedido criado",
     },
     "order.closed": {
-        "action": "ignore_if_final",
-        "description": "Pedido fechado",
+        "action": "mark_expired",
+        "link_status": "EXPIRED",
+        "description": "Pedido fechado/expirado",
     },
     "order.updated": {
         "action": "ignore",
         "description": "Pedido atualizado",
     },
-    # Charge events
+
+    # Charge events (secondary: may overlap with order events)
     "charge.paid": {
         "action": "create_attempt",
         "attempt_status": "PAID",
@@ -50,19 +54,25 @@ EVENT_MAP = {
         "description": "Cobrança estornada",
     },
     "charge.pending": {
-        "action": "create_attempt",
-        "attempt_status": "PENDING",
+        "action": "ignore",
         "description": "Cobrança pendente",
     },
     "charge.processing": {
-        "action": "create_attempt",
-        "attempt_status": "PROCESSING",
+        "action": "ignore",
         "description": "Cobrança processando",
     },
     "charge.chargedback": {
         "action": "create_attempt",
         "attempt_status": "CHARGEDBACK",
-        "description": "Chargeback na cobrança",
+        "description": "Chargeback",
+    },
+    "charge.updated": {
+        "action": "ignore",
+        "description": "Cobrança atualizada",
+    },
+    "charge.created": {
+        "action": "ignore",
+        "description": "Cobrança criada",
     },
     "charge.underpaid": {
         "action": "ignore",
@@ -86,61 +96,40 @@ EVENT_MAP = {
     },
     "charge.antifraud_manual": {
         "action": "ignore",
-        "description": "Antifraude análise manual",
+        "description": "Antifraude manual",
     },
     "charge.antifraud_pending": {
         "action": "ignore",
         "description": "Antifraude pendente",
     },
+
     # Checkout events
     "checkout.created": {
         "action": "ignore",
         "description": "Checkout criado",
     },
     "checkout.canceled": {
-        "action": "ignore_if_final",
+        "action": "mark_expired",
+        "link_status": "EXPIRED",
         "description": "Checkout cancelado",
     },
     "checkout.closed": {
-        "action": "ignore_if_final",
+        "action": "mark_expired",
+        "link_status": "EXPIRED",
         "description": "Checkout fechado",
-    },
-    # Charge events (legacy)
-    "charge.created": {
-        "action": "ignore",
-        "description": "Cobrança criada",
-    },
-    "charge.updated": {
-        "action": "ignore",
-        "description": "Cobrança atualizada",
     },
 }
 
-# States that are considered final (no further transitions)
+# States that are considered final
 FINAL_STATES = {"PAID", "CANCELED", "EXPIRED", "REFUNDED"}
 
-# States that should not be regressed
+# States that should never be regressed
 NO_REGRESS_STATES = {"PAID", "REFUNDED"}
 
 
 def get_event_config(event_type: str) -> dict | None:
-    """Get configuration for an event type."""
     return EVENT_MAP.get(event_type)
 
 
 def is_final_state(status: str) -> bool:
-    """Check if a status is final."""
     return status in FINAL_STATES
-
-
-def can_transition(current_status: str, new_status: str) -> bool:
-    """Check if a state transition is allowed.
-
-    Rules:
-    - Never regress from PAID or REFUNDED
-    - Never go from CANCELED or EXPIRED to ACTIVE
-    - FAILED attempts don't close the link
-    """
-    if current_status in NO_REGRESS_STATES:
-        return False
-    return not (current_status in ("CANCELED", "EXPIRED") and new_status == "ACTIVE")

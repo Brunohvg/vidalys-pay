@@ -1,5 +1,9 @@
-"""WhatsApp message templates — versioned text templates."""
+"""WhatsApp message templates."""
 from django.conf import settings
+
+
+def _brl(cents: int) -> str:
+    return f"R$ {cents / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def invitation_message(*, seller_name: str, activation_url: str) -> str:
@@ -54,16 +58,26 @@ def payment_approved_message(
     )
 
 
-def payment_failed_message(*, reference: str, amount_cents: int) -> str:
+def payment_failed_message(*, reference: str, amount_cents: int, failure_reason: str = "") -> str:
     """Template for payment attempt failed message."""
-    amount_formatted = f"R$ {amount_cents / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    amount_formatted = _brl(amount_cents)
 
-    return (
-        f"Uma tentativa de pagamento não foi aprovada.\n\n"
-        f"Pedido: {reference}\n"
-        f"Valor: {amount_formatted}\n\n"
-        f"O link continua disponível enquanto estiver ativo."
-    )
+    lines = [
+        "Uma tentativa de pagamento não foi aprovada.",
+        "",
+        f"Pedido: {reference}",
+        f"Valor: {amount_formatted}",
+    ]
+
+    if failure_reason:
+        lines.append(f"Motivo: {failure_reason}")
+
+    lines.extend([
+        "",
+        "O link continua disponível enquanto estiver ativo e o cliente pode tentar novamente.",
+    ])
+
+    return "\n".join(lines)
 
 
 def payment_expired_message(*, reference: str) -> str:

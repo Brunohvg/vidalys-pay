@@ -147,8 +147,9 @@ MAX_NOTIFICATION_ATTEMPTS = env.int("MAX_NOTIFICATION_ATTEMPTS")
 # Pagar.me
 PAGARME_BASE_URL = env("PAGARME_BASE_URL", default="https://sdx-api.pagar.me/core/v5")
 PAGARME_SECRET_KEY = env("PAGARME_SECRET_KEY", default="")
-# Webhook: Pagar.me envia Basic Auth com este segredo como username (senha vazia)
+PAGARME_WEBHOOK_AUTH_MODE = env("PAGARME_WEBHOOK_AUTH_MODE", default="basic")
 PAGARME_WEBHOOK_BASIC_AUTH_USER = env("PAGARME_WEBHOOK_BASIC_AUTH_USER", default="")
+PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD = env("PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD", default="")
 
 # Evolution API
 EVOLUTION_API_URL = env("EVOLUTION_API_URL", default="")
