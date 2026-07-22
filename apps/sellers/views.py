@@ -233,6 +233,19 @@ def _mask_phone(phone: str) -> str:
     return phone[:5] + "*" * (len(phone) - 8) + phone[-3:]
 
 
+@seller_login_required
+@require_GET
+def app_freight(request):
+    seller = request.seller
+    from apps.freight.config import PACKAGE_PRESETS
+
+    return render(request, "sellers/app_freight.html", {
+        "seller": seller,
+        "active_tab": "freight",
+        "presets": PACKAGE_PRESETS,
+    })
+
+
 @require_GET
 def index(request):
     return redirect("sellers:app_new_link")

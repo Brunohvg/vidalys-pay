@@ -13,6 +13,7 @@ urlpatterns = [
     # App pages
     path("app/", views.app_new_link, name="app_new_link"),
     path("app/historico/", views.app_history, name="app_history"),
+    path("app/frete/", views.app_freight, name="app_freight"),
     path("app/perfil/", views.app_profile, name="app_profile"),
     path("app/sucesso/", views.app_success, name="app_success"),
     # Session

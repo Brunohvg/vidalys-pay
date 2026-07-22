@@ -50,6 +50,10 @@
             <img src="{% static 'ui-icons/calendar.svg' %}" alt="" width="20" height="20">
             Histórico
         </a>
+        <a href="/app/frete/" class="{% if active_tab == 'freight' %}active{% endif %}" aria-label="Calcular frete">
+            <img src="{% static 'ui-icons/truck.svg' %}" alt="" width="20" height="20">
+            Calcular frete
+        </a>
         <a href="/app/perfil/" class="{% if active_tab == 'profile' %}active{% endif %}" aria-label="Perfil">
             <img src="{% static 'ui-icons/user.svg' %}" alt="" width="20" height="20">
             Perfil
