@@ -108,3 +108,16 @@ def payment_refunded_message(*, reference: str, amount_cents: int) -> str:
         f"Valor: {amount_formatted}\n\n"
         f"O pagamento foi estornado."
     )
+
+
+def payment_chargedback_message(*, reference: str, amount_cents: int) -> str:
+    """Template for payment link chargeback message."""
+    amount_formatted = _brl(amount_cents)
+
+    return (
+        f"Chargeback recebido\n\n"
+        f"Pedido: {reference}\n"
+        f"Valor: {amount_formatted}\n\n"
+        f"Um chargeback foi registrado para este pagamento. "
+        f"Verifique a disputa no painel do Pagar.me."
+    )

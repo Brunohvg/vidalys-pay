@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.notifications.whatsapp_service import (
     queue_payment_approved,
     queue_payment_canceled,
+    queue_payment_chargedback,
     queue_payment_expired,
     queue_payment_failed,
     queue_payment_refunded,
@@ -133,6 +134,14 @@ def _handle_create_attempt(event, payment_link, config, normalized):
         from django.db import transaction as txn
         txn.on_commit(lambda: queue_payment_approved(
             seller=payment_link.seller, payment_link=payment_link,
+        ))
+
+    if config.get("attempt_status") == "CHARGEDBACK":
+        from django.db import transaction as txn
+        charge_id = normalized.charge_id or ""
+        txn.on_commit(lambda: queue_payment_chargedback(
+            seller=payment_link.seller, payment_link=payment_link,
+            dedup_suffix=charge_id,
         ))
 
     logger.info("Attempt %s criado/atualizado para link %s", attempt.id, payment_link.id)

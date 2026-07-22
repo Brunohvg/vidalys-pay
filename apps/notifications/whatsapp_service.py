@@ -11,6 +11,7 @@ from .templates_msg import (
     invitation_message,
     payment_approved_message,
     payment_canceled_message,
+    payment_chargedback_message,
     payment_expired_message,
     payment_failed_message,
     payment_link_created_message,
@@ -242,6 +243,33 @@ def queue_payment_refunded(
         seller=seller,
         template_key=f"payment_refunded{dedup_key_suffix}",
         event_type="payment_refunded",
+        text=text,
+        topic="whatsapp.send",
+        aggregate_type="payment_link",
+        aggregate_id=payment_link.id,
+        payment_link=payment_link,
+        recipient_phone=seller.whatsapp_phone,
+        recipient_type=RecipientType.SELLER,
+    )
+
+
+def queue_payment_chargedback(
+    *,
+    seller: Seller,
+    payment_link,
+    dedup_suffix: str = "",
+) -> WhatsAppMessage:
+    text = payment_chargedback_message(
+        reference=payment_link.reference,
+        amount_cents=payment_link.amount_cents,
+    )
+
+    dedup_key_suffix = f":{dedup_suffix}" if dedup_suffix else ""
+
+    return _queue_message(
+        seller=seller,
+        template_key=f"payment_chargedback{dedup_key_suffix}",
+        event_type="payment_chargedback",
         text=text,
         topic="whatsapp.send",
         aggregate_type="payment_link",
