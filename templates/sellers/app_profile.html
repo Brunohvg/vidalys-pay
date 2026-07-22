@@ -36,10 +36,10 @@
 </div>
 
 <div class="card">
-    <a href="{% static 'manifest.webmanifest' %}" class="profile-action" download>
+    <button id="pwa-install-button" class="profile-action" type="button" style="width:100%;font-family:var(--font-sans);">
         <span class="profile-action__text">Instalar aplicativo</span>
         <span class="profile-action__arrow">›</span>
-    </a>
+    </button>
 
     <button class="profile-action profile-action--danger" onclick="requestLogout()" type="button">
         <span class="profile-action__text">Sair deste aparelho</span>

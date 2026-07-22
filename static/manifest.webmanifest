@@ -1,9 +1,10 @@
 {
   "name": "Vidalys Pay",
   "short_name": "Vidalys Pay",
-  "description": "Gerador de links de pagamento",
+  "description": "Crie e compartilhe links de pagamento com seguran\u00e7a",
+  "id": "/app/",
   "start_url": "/app/",
-  "scope": "/app/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#071B4A",
   "theme_color": "#071B4A",

@@ -1,25 +1,20 @@
 """Pagar.me HTTP client — V5 API integration.
 
-Authentication: Basic Auth with SecretKey as username, empty password.
-- Sandbox: sk_test_* → https://sdx-api.pagar.me/core/v5
-- Production: sk_* → https://api.pagar.me/core/v5
+Authentication: Basic Auth with Secret Key as username, empty password.
+Uses the credential normalizer to accept multiple input formats safely.
 """
-import base64
 import logging
 from typing import Any
 
 import httpx
 from django.conf import settings
 
-logger = logging.getLogger("apps.integrations.pagarme")
+from .credentials import get_credential
 
-# Timeouts: connection 3s, read 10s
-DEFAULT_TIMEOUT = httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0)
+logger = logging.getLogger("apps.integrations.pagarme")
 
 
 class PagarmeError(Exception):
-    """Base exception for Pagar.me errors."""
-
     def __init__(self, status_code: int, error_data: dict):
         self.status_code = status_code
         self.error_data = error_data
@@ -31,43 +26,51 @@ class PagarmeClient:
 
     def __init__(self):
         self.base_url = settings.PAGARME_BASE_URL.rstrip("/")
-        self.secret_key = settings.PAGARME_SECRET_KEY
-        self._auth_header = self._build_auth()
-
-    def _build_auth(self) -> str:
-        """Build Basic Auth header: base64(secret_key:).
-
-        Aceita tanto a chave raw (sk_xxx) quanto já convertida em base64.
-        """
-        key = self.secret_key.strip()
-
-        # Se já parece ser base64 (contém apenas chars válidos de base64 e tem tamanho par)
-        # e NÃO começa com sk_, assume que já está convertido
-        if not key.startswith("sk_") and self._is_likely_base64(key):
-            return f"Basic {key}"
-
-        # Senão, converte: base64(secret_key:)
-        credentials = f"{key}:"
-        encoded = base64.b64encode(credentials.encode()).decode()
-        return f"Basic {encoded}"
-
-    @staticmethod
-    def _is_likely_base64(value: str) -> bool:
-        """Check if a string looks like it's already base64 encoded."""
-        import re
-        # Base64 chars: A-Z, a-z, 0-9, +, /, =
-        # Typical base64 length is multiple of 4 (with padding)
-        if not value:
-            return False
-        pattern = re.compile(r'^[A-Za-z0-9+/]+=*$')
-        return bool(pattern.match(value)) and len(value) >= 8
+        self._credential = get_credential()
+        self._timeout = httpx.Timeout(
+            connect=getattr(settings, "PAGARME_CONNECT_TIMEOUT_SECONDS", 5),
+            read=getattr(settings, "PAGARME_READ_TIMEOUT_SECONDS", 20),
+            write=20,
+            pool=5,
+        )
 
     def _headers(self) -> dict:
         return {
-            "Authorization": self._auth_header,
+            "Authorization": self._credential.authorization_header,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+
+    def _post(self, path: str, json: dict) -> dict[str, Any]:
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        response = httpx.post(url, json=json, headers=self._headers(), timeout=self._timeout)
+        return self._handle_response(response)
+
+    def _get(self, path: str) -> dict[str, Any]:
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        response = httpx.get(url, headers=self._headers(), timeout=self._timeout)
+        return self._handle_response(response)
+
+    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
+        if response.status_code < 400:
+            return response.json()
+
+        error_data = {}
+        try:
+            error_data = response.json() if response.text else {}
+        except Exception:
+            error_data = {"raw": response.text[:200]}
+
+        if response.status_code == 401:
+            logger.error("Pagar.me 401: autenticação recusada")
+        elif response.status_code == 403:
+            logger.error("Pagar.me 403: acesso não autorizado (conta/permissão)")
+        elif response.status_code == 429:
+            logger.error("Pagar.me 429: rate limit")
+        else:
+            logger.error("Pagar.me HTTP %d: %s", response.status_code, error_data)
+
+        raise PagarmeError(response.status_code, error_data)
 
     def create_payment_link(
         self,
@@ -81,11 +84,6 @@ class PagarmeClient:
         customer_name: str | None = None,
         metadata: dict | None = None,
     ) -> dict[str, Any]:
-        """Create a payment link (checkout) for one-time order.
-
-        Returns the full API response including id, url, status.
-        """
-        # Build installments array: each installment has number and total
         installments_list = [
             {"number": i, "total": amount_cents}
             for i in range(1, installments + 1)
@@ -115,7 +113,6 @@ class PagarmeClient:
             },
         }
 
-        # Optional fields
         if expires_in_minutes is not None:
             payload["expires_in"] = expires_in_minutes
 
@@ -124,66 +121,30 @@ class PagarmeClient:
 
         logger.info(
             "Criando link Pagar.me: ref=%s amount=%d installments=%d",
-            reference,
-            amount_cents,
-            installments,
+            reference, amount_cents, installments,
         )
 
-        response = httpx.post(
-            f"{self.base_url}/paymentlinks",
-            json=payload,
-            headers=self._headers(),
-            timeout=DEFAULT_TIMEOUT,
-        )
+        data = self._post("paymentlinks", payload)
 
-        if response.status_code >= 400:
-            error_data = response.json() if response.text else {}
-            logger.error(
-                "Pagar.me erro %d: %s",
-                response.status_code,
-                error_data,
-            )
-            raise PagarmeError(response.status_code, error_data)
-
-        data = response.json()
         logger.info(
-            "Link criado: id=%s status=%s url=%s",
-            data.get("id"),
-            data.get("status"),
-            data.get("url", "")[:50],
+            "Link criado: id=%s status=%s",
+            data.get("id"), data.get("status"),
         )
         return data
 
     def get_payment_link(self, link_id: str) -> dict[str, Any]:
-        """Get payment link by ID."""
-        response = httpx.get(
-            f"{self.base_url}/paymentlinks/{link_id}",
-            headers=self._headers(),
-            timeout=DEFAULT_TIMEOUT,
-        )
-
-        if response.status_code >= 400:
-            error_data = response.json() if response.text else {}
-            raise PagarmeError(response.status_code, error_data)
-
-        return response.json()
+        return self._get(f"paymentlinks/{link_id}")
 
     def cancel_payment_link(self, link_id: str) -> dict[str, Any]:
-        """Cancel a payment link."""
+        url = f"{self.base_url}/paymentlinks/{link_id}"
         response = httpx.patch(
-            f"{self.base_url}/paymentlinks/{link_id}",
+            url,
             json={"is_building": True},
             headers=self._headers(),
-            timeout=DEFAULT_TIMEOUT,
+            timeout=self._timeout,
         )
-
-        if response.status_code >= 400:
-            error_data = response.json() if response.text else {}
-            raise PagarmeError(response.status_code, error_data)
-
-        return response.json()
+        return self._handle_response(response)
 
 
 def get_client() -> PagarmeClient:
-    """Get a Pagar.me client instance."""
     return PagarmeClient()
