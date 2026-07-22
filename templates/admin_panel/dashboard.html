@@ -1,0 +1,96 @@
+{% extends "admin_panel/base.html" %}
+
+{% block content %}
+{% if error %}
+    <div class="alert alert--error">{{ error }}</div>
+{% endif %}
+
+<h1 class="admin-title">Vendedores</h1>
+
+<div class="card-form">
+    <h2>Novo vendedor</h2>
+    <form method="post" action="{% url 'admin_panel:create_seller' %}">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Nome</label>
+                <input type="text" id="name" name="name" placeholder="Nome do vendedor" required>
+            </div>
+            <div class="form-group">
+                <label for="whatsapp">WhatsApp</label>
+                <input type="text" id="whatsapp" name="whatsapp" placeholder="+5511999999999" required>
+            </div>
+            <div class="form-group" style="max-width: 160px;">
+                <label for="max_amount">Limite (R$)</label>
+                <input type="number" id="max_amount" name="max_amount" placeholder="500,00" step="0.01" min="1">
+            </div>
+            <button type="submit" class="btn-primary">Criar vendedor</button>
+        </div>
+    </form>
+</div>
+
+{% if seller_data %}
+    <div style="overflow-x: auto;">
+        <table class="seller-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>WhatsApp</th>
+                    <th>Limite</th>
+                    <th>Status</th>
+                    <th>Convite</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in seller_data %}
+                <tr>
+                    <td>
+                        <strong>{{ item.seller.name }}</strong>
+                        <div style="font-size: var(--text-xs); color: var(--color-gray-400);">{{ item.seller.created_at|date:"d/m/Y" }}</div>
+                    </td>
+                    <td style="font-family: monospace;">{{ item.seller.whatsapp_phone }}</td>
+                    <td style="font-family: monospace;">R$ {{ item.seller.max_payment_amount_cents|stringformat:"d"|slice:":-2" }},{{ item.seller.max_payment_amount_cents|stringformat:"d"|slice:"-2:" }}</td>
+                    <td>
+                        {% if item.seller.is_active %}
+                            <span class="badge badge--active">Ativo</span>
+                        {% else %}
+                            <span class="badge badge--inactive">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="invitation-cell">
+                        {% if item.active_invitation %}
+                            <span class="invitation-link">{{ item.invitation_url }}</span>
+                            <div style="font-size: var(--text-xs); color: var(--color-gray-400); margin-top: 2px;">
+                                Expira {{ item.active_invitation.expires_at|date:"d/m H:i" }}
+                            </div>
+                        {% else %}
+                            <span style="font-size: var(--text-xs); color: var(--color-gray-400);">Nenhum ativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <form method="post" action="{% url 'admin_panel:regenerate_invitation' seller_id=item.seller.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-sm btn-sm--success" title="Gerar novo convite">Convidar</button>
+                        </form>
+                        <form method="post" action="{% url 'admin_panel:toggle_seller' seller_id=item.seller.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            {% if item.seller.is_active %}
+                                <button type="submit" class="btn-sm btn-sm--danger">Desativar</button>
+                            {% else %}
+                                <button type="submit" class="btn-sm">Ativar</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <p>Nenhum vendedor cadastrado.</p>
+        <p>Use o formulário acima para criar o primeiro.</p>
+    </div>
+{% endif %}
+{% endblock %}

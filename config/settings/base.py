@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "apps.core",
+    "apps.admin_panel",
     "apps.sellers",
     "apps.payment_links",
     "apps.webhooks",
