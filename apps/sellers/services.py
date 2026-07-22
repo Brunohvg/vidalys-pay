@@ -66,7 +66,6 @@ def validate_invitation(*, raw_token: str) -> tuple[dict | None, str | None, str
     invitation = (
         SellerInvitation.objects
         .select_related("seller")
-        .select_for_update()
         .filter(token_hash=token_hash)
         .first()
     )
