@@ -1,0 +1,11 @@
+{% load static %}
+<header class="panel-header">
+    <button class="panel-header__menu" id="menuToggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="panelSidebar">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="panel-header__info">
+        <h1 class="panel-header__title">{% block page_title %}Painel{% endblock %}</h1>
+        {% block page_description %}{% endblock %}
+    </div>
+    {% block header_action %}{% endblock %}
+</header>

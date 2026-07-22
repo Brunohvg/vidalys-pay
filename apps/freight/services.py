@@ -155,7 +155,7 @@ def calculate_freight(package: PackageData) -> list[FreightOption]:
 
     cache.set(cache_key, options_dicts, timeout=_FREIGHT_CACHE_TTL)
 
-    return options
+    return options_dicts
 
 
 def lookup_cep(zip_code: str) -> CEPAddressData | None:

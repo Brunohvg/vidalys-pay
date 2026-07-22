@@ -1,0 +1,105 @@
+{% extends "panel/base.html" %}
+{% load formatting %}
+
+{% block title %}Visão geral{% endblock %}
+
+{% block page_title %}Visão geral{% endblock %}
+{% block page_description %}<p class="panel-header__desc">Resumo dos vendedores e links de pagamento.</p>{% endblock %}
+
+{% block content %}
+<div class="panel-grid">
+    <div class="panel-stat">
+        <div class="panel-stat__icon panel-stat__icon--blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <div class="panel-stat__value">{{ total_sellers }}</div>
+        <div class="panel-stat__label">Total de vendedores</div>
+    </div>
+
+    <div class="panel-stat">
+        <div class="panel-stat__icon panel-stat__icon--green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="panel-stat__value">{{ active_sellers }}</div>
+        <div class="panel-stat__label">Vendedores ativos</div>
+    </div>
+
+    <div class="panel-stat">
+        <div class="panel-stat__icon panel-stat__icon--amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+        </div>
+        <div class="panel-stat__value">{{ inactive_sellers }}</div>
+        <div class="panel-stat__label">Vendedores inativos</div>
+    </div>
+
+    <div class="panel-stat">
+        <div class="panel-stat__icon panel-stat__icon--purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <div class="panel-stat__value">{{ pending_invitations }}</div>
+        <div class="panel-stat__label">Convites pendentes</div>
+    </div>
+</div>
+
+<div class="panel-actions">
+    <a href="{% url 'admin_panel:create_seller_page' %}" class="panel-card-action">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        Adicionar vendedor
+    </a>
+    <a href="{% url 'admin_panel:seller_list' %}" class="panel-card-action">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        Ver vendedores
+    </a>
+</div>
+
+<div class="panel-card">
+    <h2 class="panel-card__title">Configuração do Webhook</h2>
+    <p class="panel-card__desc">Cadastre esta URL no Pagar.me para receber notificações de pagamento.</p>
+    <div class="panel-webhook">
+        <code class="panel-webhook__url">{{ webhook_url }}</code>
+        <button type="button" class="panel-webhook__copy" onclick="copyWebhookUrl(this)" data-url="{{ webhook_url }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copiar
+        </button>
+    </div>
+    <p class="panel-card__hint">Use autenticação Basic Auth com o usuário e senha configurados em <code>PAGARME_WEBHOOK_BASIC_AUTH_USER</code> e <code>PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD</code>.</p>
+</div>
+
+{% if recent_sellers %}
+<div class="panel-card">
+    <h2 class="panel-card__title">Vendedores recentes</h2>
+    <div class="panel-seller-list">
+        {% for s in recent_sellers %}
+        <div class="panel-seller-row">
+            <div class="panel-seller-row__info">
+                <span class="panel-seller-row__name">{{ s.name }}</span>
+                <span class="panel-seller-row__phone">{{ s.whatsapp_phone }}</span>
+            </div>
+            {% if s.is_active %}
+            <span class="panel-badge panel-badge--active">Ativo</span>
+            {% else %}
+            <span class="panel-badge panel-badge--inactive">Inativo</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyWebhookUrl(btn) {
+    var url = btn.getAttribute('data-url');
+    navigator.clipboard.writeText(url).then(function() {
+        var original = btn.innerHTML;
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
+        btn.style.color = 'var(--vidalys-green)';
+        setTimeout(function() {
+            btn.innerHTML = original;
+            btn.style.color = '';
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

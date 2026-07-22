@@ -1,0 +1,93 @@
+{% extends "panel/base.html" %}
+
+{% block title %}Criar vendedor{% endblock %}
+
+{% block page_title %}Criar vendedor{% endblock %}
+{% block page_description %}<p class="panel-header__desc">Cadastre um novo vendedor e envie o convite de acesso.</p>{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="panel-message panel-message--error" style="margin-bottom:var(--space-4);">
+    <span class="panel-message__text">{{ error }}</span>
+</div>
+{% endif %}
+
+<div class="panel-card">
+    <form method="post" id="createSellerForm">
+        {% csrf_token %}
+
+        <div class="panel-fields">
+            <div class="panel-field">
+                <label class="panel-field__label" for="name">Nome completo</label>
+                <input type="text" id="name" name="name" class="panel-field__input"
+                       placeholder="Nome do vendedor" required autocomplete="off"
+                       value="{{ form_data.name|default:'' }}">
+            </div>
+
+            <div class="panel-field">
+                <label class="panel-field__label" for="whatsapp_display">WhatsApp</label>
+                <input type="tel" id="whatsapp_display" class="panel-field__input"
+                       placeholder="(31) 99999-9999" required autocomplete="off" maxlength="20"
+                       value="{{ form_data.phone|default:'' }}">
+                <input type="hidden" id="whatsapp" name="whatsapp">
+                <p class="panel-field__hint">O link de acesso será enviado automaticamente para este número.</p>
+            </div>
+
+            <details class="panel-field__advanced">
+                <summary class="panel-field__advanced-toggle">Mais opções</summary>
+                <div class="panel-field" style="margin-top:var(--space-4);">
+                    <label class="panel-field__label" for="max_amount">Limite por link (R$)</label>
+                    <input type="number" id="max_amount" name="max_amount" class="panel-field__input"
+                           placeholder="500,00" step="0.01" min="1" value="{{ form_data.max_amount|default:'500.00' }}">
+                    <p class="panel-field__hint">Valor máximo por link. Padrão: R$ 500,00.</p>
+                </div>
+            </details>
+        </div>
+
+        <button type="submit" class="panel-btn panel-btn--primary" id="submitBtn" style="margin-top:var(--space-5);">
+            <span class="panel-btn__text">Criar vendedor</span>
+            <span class="panel-btn__spinner"></span>
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var display = document.getElementById('whatsapp_display');
+    var hidden = document.getElementById('whatsapp');
+    if (!display || !hidden) return;
+
+    display.addEventListener('input', function() {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length > 11) raw = raw.slice(0, 11);
+        var formatted = '';
+        if (raw.length > 0) {
+            formatted = '(' + raw.slice(0, 2);
+            if (raw.length > 2) {
+                formatted += ') ' + (raw.length > 7 ? raw.slice(2, 7) + '-' + raw.slice(7) : raw.slice(2));
+            }
+        }
+        this.value = formatted;
+        hidden.value = raw.length === 11 ? '+55' + raw : '';
+    });
+
+    display.addEventListener('blur', function() {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw.length > 0 && raw.length < 11) {
+            this.style.borderColor = 'var(--color-danger)';
+        } else {
+            this.style.borderColor = '';
+        }
+    });
+
+    var form = document.getElementById('createSellerForm');
+    var btn = document.getElementById('submitBtn');
+    form.addEventListener('submit', function() {
+        btn.classList.add('panel-btn--loading');
+        btn.disabled = true;
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#071B4A">
+    <title>{% block title %}Painel{% endblock %} — Vidalys Pay</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicons/favicon.svg' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'panel/css/panel.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="panel-body">
+    <button class="panel-overlay" id="sidebarOverlay" aria-hidden="true" tabindex="-1"></button>
+    {% include "panel/components/sidebar.html" %}
+    <div class="panel-main">
+        {% include "panel/components/header.html" %}
+        {% include "panel/components/messages.html" %}
+        <main class="panel-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% include "panel/components/modal.html" %}
+    <script src="{% static 'panel/js/panel.js' %}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

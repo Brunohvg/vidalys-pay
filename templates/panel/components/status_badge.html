@@ -1,0 +1,11 @@
+{% if status %}
+<span class="panel-badge panel-badge--{{ status }}">
+    {% if status == 'active' %}Ativo
+    {% elif status == 'inactive' %}Inativo
+    {% elif status == 'pending' %}Convite pendente
+    {% elif status == 'sent' %}Convite enviado
+    {% elif status == 'accepted' %}Acesso criado
+    {% else %}{{ status }}
+    {% endif %}
+</span>
+{% endif %}

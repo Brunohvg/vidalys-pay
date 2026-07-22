@@ -1,0 +1,203 @@
+{% extends "panel/base.html" %}
+{% load formatting %}
+
+{% block title %}Criar link{% endblock %}
+
+{% block page_title %}Criar link de pagamento{% endblock %}
+
+{% block content %}
+<a href="{% url 'admin_panel:seller_list' %}" class="panel-back">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    Voltar para vendedores
+</a>
+
+<div class="panel-card panel-card--seller">
+    <div class="panel-seller-avatar">{{ seller.name|slice:":2"|upper }}</div>
+    <div>
+        <div class="panel-seller-avatar__name">{{ seller.name }}</div>
+        <div class="panel-seller-avatar__phone">{{ seller.whatsapp_phone }}</div>
+    </div>
+    {% if not seller.is_active %}
+    <span class="panel-badge panel-badge--inactive" style="margin-left:auto;">Inativo</span>
+    {% endif %}
+</div>
+
+{% if success %}
+<div class="panel-card panel-card--success">
+    <div class="panel-success-icon">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--vidalys-green)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <h2 class="panel-success-title">Link criado com sucesso!</h2>
+
+    <div class="panel-success-details">
+        <div class="panel-success-row">
+            <span>Referência</span>
+            <span>{{ payment_link.reference }}</span>
+        </div>
+        <div class="panel-success-row">
+            <span>Valor</span>
+            <span class="panel-success-amount">{{ payment_link.amount_cents|format_brl }}</span>
+        </div>
+        <div class="panel-success-row">
+            <span>Parcelas</span>
+            <span>{{ payment_link.installments }}x sem juros</span>
+        </div>
+        {% if payment_link.customer_name %}
+        <div class="panel-success-row">
+            <span>Cliente</span>
+            <span>{{ payment_link.customer_name }}</span>
+        </div>
+        {% endif %}
+        <div class="panel-success-row">
+            <span>Status</span>
+            <span class="panel-badge panel-badge--active">{{ payment_link.status }}</span>
+        </div>
+    </div>
+
+    {% if whatsapp_status %}
+    <div class="panel-whatsapp-status">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
+        Link enviado automaticamente para o WhatsApp do vendedor
+    </div>
+    {% endif %}
+
+    <div class="panel-success-actions">
+        <button type="button" class="panel-btn panel-btn--primary" onclick="copyToClipboard('{{ payment_link.payment_url }}')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copiar link
+        </button>
+        <button type="button" class="panel-btn panel-btn--secondary" onclick="window.open('{{ payment_link.payment_url }}', '_blank')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Abrir link
+        </button>
+        <a href="{% url 'admin_panel:create_link' seller_id=seller.id %}" class="panel-btn panel-btn--ghost">Criar outro link</a>
+    </div>
+</div>
+{% else %}
+{% if error %}
+<div class="panel-message panel-message--error" style="margin-bottom:var(--space-4);">
+    <span class="panel-message__text">{{ error }}</span>
+</div>
+{% endif %}
+
+<div class="panel-card">
+    <h2 class="panel-card__title">Dados do link</h2>
+
+    <form method="post" id="createLinkForm">
+        {% csrf_token %}
+
+        <div class="panel-fields">
+            <div class="panel-field">
+                <label class="panel-field__label" for="amount">Valor (R$) <span style="color:var(--color-danger);">*</span></label>
+                <div class="panel-field__prefix">
+                    <span class="panel-field__prefix-text">R$</span>
+                    <input type="text" id="amount" name="amount_display" class="panel-field__input panel-field__input--prefix"
+                           placeholder="0,00" inputmode="decimal" required
+                           value="{{ form_data.amount_display|default:'' }}">
+                </div>
+                <p class="panel-field__hint">Valor mínimo: R$ 1,00. Limite: {{ seller.max_payment_amount_cents|format_brl }}</p>
+            </div>
+
+            <div class="panel-field">
+                <label class="panel-field__label">Parcelamento</label>
+                <div class="panel-installments" role="radiogroup">
+                    {% for i in "123"|make_list %}
+                    <button type="button" class="panel-installments__option{% if form_data.installments|default:1 == forloop.counter %} selected{% endif %}"
+                            data-value="{{ forloop.counter }}" role="radio"
+                            aria-checked="{% if form_data.installments|default:1 == forloop.counter %}true{% else %}false{% endif %}">
+                        {{ forloop.counter }}x sem juros
+                    </button>
+                    {% endfor %}
+                </div>
+                <input type="hidden" id="installments" name="installments" value="{{ form_data.installments|default:1 }}">
+            </div>
+
+            <div class="panel-field">
+                <label class="panel-field__label" for="customer_name">Cliente <span style="font-weight:400;color:var(--color-gray-400);">(opcional)</span></label>
+                <input type="text" id="customer_name" name="customer_name" class="panel-field__input"
+                       placeholder="Nome do cliente" maxlength="120"
+                       value="{{ form_data.customer_name|default:'' }}">
+            </div>
+
+            <div class="panel-field">
+                <label class="panel-field__label" for="customer_phone">Telefone do cliente <span style="font-weight:400;color:var(--color-gray-400);">(opcional)</span></label>
+                <input type="tel" id="customer_phone" name="customer_phone" class="panel-field__input"
+                       placeholder="(31) 99999-9999" maxlength="20" inputmode="tel"
+                       value="{{ form_data.customer_phone|default:'' }}">
+            </div>
+        </div>
+
+        <button type="submit" class="panel-btn panel-btn--primary" id="submitBtn" style="margin-top:var(--space-5);">
+            <span class="panel-btn__text">Criar link de pagamento</span>
+            <span class="panel-btn__spinner"></span>
+        </button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var amountInput = document.getElementById('amount');
+    if (amountInput) {
+        amountInput.addEventListener('input', function(e) {
+            var value = e.target.value.replace(/[^\d]/g, '');
+            if (value) {
+                value = (parseInt(value) / 100).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2, maximumFractionDigits: 2
+                });
+            }
+            e.target.value = value;
+        });
+    }
+
+    var installmentsInput = document.getElementById('installments');
+    document.querySelectorAll('.panel-installments__option').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.panel-installments__option').forEach(function(b) {
+                b.classList.remove('selected');
+                b.setAttribute('aria-checked', 'false');
+            });
+            this.classList.add('selected');
+            this.setAttribute('aria-checked', 'true');
+            installmentsInput.value = this.dataset.value;
+        });
+    });
+
+    var form = document.getElementById('createLinkForm');
+    var btn = document.getElementById('submitBtn');
+    form.addEventListener('submit', function() {
+        btn.classList.add('panel-btn--loading');
+        btn.disabled = true;
+    });
+});
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showPanelToast('Link copiado!');
+        }).catch(function() { fallbackCopy(text); });
+    } else { fallbackCopy(text); }
+}
+
+function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showPanelToast('Link copiado!'); } catch(e) {}
+    document.body.removeChild(ta);
+}
+
+function showPanelToast(msg) {
+    var el = document.createElement('div');
+    el.className = 'panel-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(function() { el.classList.add('show'); });
+    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 200); }, 2000);
+}
+</script>
+{% endblock %}

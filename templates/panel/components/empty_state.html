@@ -1,0 +1,8 @@
+<div class="panel-empty">
+    <div class="panel-empty__icon">{{ icon|default:'📋' }}</div>
+    <h3 class="panel-empty__title">{{ title }}</h3>
+    <p class="panel-empty__text">{{ text }}</p>
+    {% if action_url %}
+    <a href="{{ action_url }}" class="panel-empty__action">{{ action_label }}</a>
+    {% endif %}
+</div>
