@@ -14,7 +14,7 @@
 {% endif %}
 
 <div class="panel-card">
-    <form method="post" id="createSellerForm">
+    <form method="post" action="{% url 'admin_panel:create_seller' %}" id="createSellerForm">
         {% csrf_token %}
 
         <div class="panel-fields">
