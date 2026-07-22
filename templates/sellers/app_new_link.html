@@ -37,19 +37,6 @@
         </div>
 
         <div class="form-group">
-            <label class="form-label" for="reference">Referência / Pedido <span class="required">*</span></label>
-            <input
-                type="text"
-                id="reference"
-                name="reference"
-                class="form-input"
-                placeholder="Ex: PED-45892"
-                maxlength="80"
-                required
-            >
-        </div>
-
-        <div class="form-group">
             <label class="form-label" for="customer_name">Cliente <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
             <input
                 type="text"
@@ -135,8 +122,15 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.classList.add('loading');
         submitBtn.disabled = true;
 
+        const now = new Date();
+        const refDate = now.getFullYear().toString() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0');
+        const refRandom = Math.random().toString(36).slice(2, 6).toUpperCase();
+        const autoReference = refDate + '-' + refRandom;
+
         const payload = {
-            reference: form.reference.value,
+            reference: autoReference,
             amount_cents: parseInt(amountCents.value),
             installments: parseInt(installmentsInput.value),
             customer_name: form.customer_name.value || null,
