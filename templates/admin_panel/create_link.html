@@ -1,5 +1,6 @@
 {% extends "admin_panel/base.html" %}
 {% load static %}
+{% load formatting %}
 
 {% block content %}
 <div class="admin-content">
@@ -37,7 +38,7 @@
                 </div>
                 <div class="success-row">
                     <span class="success-label">Valor</span>
-                    <span class="success-value success-amount">R$ {{ payment_link.amount_cents|floatformat:2 }}</span>
+                    <span class="success-value success-amount">{{ payment_link.amount_cents|format_brl }}</span>
                 </div>
                 <div class="success-row">
                     <span class="success-label">Parcelas</span>
@@ -102,7 +103,7 @@
                             value="{{ form_data.amount_display|default:'' }}"
                         >
                     </div>
-                    <span class="form-hint">Valor mínimo: R$ 1,00. Limite do vendedor: R$ {{ seller.max_payment_amount_cents|floatformat:2 }}</span>
+                    <span class="form-hint">Valor mínimo: R$ 1,00. Limite do vendedor: {{ seller.max_payment_amount_cents|format_brl }}</span>
                 </div>
 
                 <div class="form-group">

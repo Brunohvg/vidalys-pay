@@ -1,4 +1,5 @@
 {% extends "admin_panel/base.html" %}
+{% load formatting %}
 
 {% block content %}
 <div class="admin-content">
@@ -57,7 +58,7 @@
                 </div>
 
                 <div class="seller-card__meta">
-                    <span>Limite: R$ {{ item.seller.max_payment_amount_cents|floatformat:2 }}</span>
+                    <span>Limite: {{ item.seller.max_payment_amount_cents|format_brl }}</span>
                     <span>Criado {{ item.seller.created_at|date:"d/m/Y" }}</span>
                 </div>
 

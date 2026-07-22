@@ -1,4 +1,5 @@
 {% extends "sellers/app_base.html" %}
+{% load formatting %}
 
 {% block content %}
 <div class="filters" role="tablist" aria-label="Filtrar por status">
@@ -36,7 +37,7 @@
                     <span class="badge badge--created">{{ link.get_status_display }}</span>
                 {% endif %}
             </div>
-            <div class="link-card__amount">R$ {{ link.amount_cents|floatformat:2 }}</div>
+            <div class="link-card__amount">{{ link.amount_cents|format_brl }}</div>
             <div class="link-card__meta">
                 <span>{{ link.installments }}x sem juros</span>
                 <span>{{ link.created_at|date:"d/m/Y H:mm" }}</span>

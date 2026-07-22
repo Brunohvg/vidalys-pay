@@ -1,5 +1,6 @@
 {% extends "sellers/app_base.html" %}
 {% load static %}
+{% load formatting %}
 
 {% block content %}
 <div class="card">
@@ -15,7 +16,7 @@
 
     <div class="profile-section">
         <div class="profile-label">Limite por link</div>
-        <div class="profile-value">R$ {{ seller.max_payment_amount_cents|floatformat:2 }}</div>
+        <div class="profile-value">{{ seller.max_payment_amount_cents|format_brl }}</div>
     </div>
 </div>
 
