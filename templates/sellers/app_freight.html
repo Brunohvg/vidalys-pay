@@ -444,8 +444,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('addressCity').textContent = addr.city && addr.state ? addr.city + ' — ' + addr.state : (addr.city || addr.state || '');
         document.getElementById('addressZip').textContent = 'CEP ' + addr.zip_code;
 
+        stepCep.style.display = 'none';
+        stepAddress.style.display = 'block';
+        stepPackage.style.display = 'none';
+        stepResults.style.display = 'none';
         hideError();
-        goToStep('destination');
+        updateProgressBar('destination');
     }
 
     confirmAddressBtn.addEventListener('click', function() {
