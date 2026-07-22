@@ -6,13 +6,16 @@ from decimal import Decimal, ROUND_HALF_UP
 import httpx
 from django.core.cache import cache
 
-from .config import PACKAGE_PRESETS
+from .config import PACKAGE_PRESETS, get_correios_config, is_correios_configured
 from .correios import CorreiosFreightClient
 from .dataclasses import CEPAddressData, FreightOption, PackageData
 from .exceptions import (
+    FreightAuthenticationError,
     FreightConfigurationError,
+    FreightConnectionError,
     FreightError,
     FreightProviderUnavailable,
+    FreightTimeoutError,
     FreightValidationError,
 )
 
@@ -76,16 +79,14 @@ def validate_and_build_package(
 
 
 def calculate_freight(package: PackageData) -> list[FreightOption]:
-    from .config import get_correios_config
-
     config = get_correios_config()
 
-    if not config.enabled:
+    if not is_correios_configured(config):
         raise FreightConfigurationError(
             "O cálculo de frete ainda não foi configurado."
         )
 
-    cache_key = _build_cache_key(package)
+    cache_key = _build_cache_key(package, config)
 
     cached = cache.get(cache_key)
     if cached is not None:
@@ -100,6 +101,15 @@ def calculate_freight(package: PackageData) -> list[FreightOption]:
         options = client.calculate(package)
     except FreightConfigurationError:
         raise
+    except FreightAuthenticationError as exc:
+        logger.warning("frete_authentication_error=true cep=%s***", package.destination_zip_code[:5])
+        raise FreightProviderUnavailable(str(exc)) from exc
+    except FreightTimeoutError as exc:
+        logger.warning("frete_timeout=true cep=%s***", package.destination_zip_code[:5])
+        raise FreightProviderUnavailable(str(exc)) from exc
+    except FreightConnectionError as exc:
+        logger.warning("frete_connection_error=true cep=%s***", package.destination_zip_code[:5])
+        raise FreightProviderUnavailable(str(exc)) from exc
     except FreightError:
         raise
     except Exception as exc:
@@ -127,10 +137,7 @@ def calculate_freight(package: PackageData) -> list[FreightOption]:
 
 
 def lookup_cep(zip_code: str) -> CEPAddressData | None:
-    """Look up CEP address via ViaCEP with BrasilAPI fallback.
-
-    Returns CEPAddressData or None if not found.
-    """
+    """Look up CEP address via ViaCEP with BrasilAPI fallback."""
     clean = re.sub(r"\D", "", zip_code or "")
     if len(clean) != 8:
         return None
@@ -142,10 +149,8 @@ def lookup_cep(zip_code: str) -> CEPAddressData | None:
             return CEPAddressData(**cached)
         return cached
 
-    # Try ViaCEP first
     result = _lookup_viacep(clean)
     if result is None:
-        # Fallback to BrasilAPI
         result = _lookup_brasilapi(clean)
 
     if result is not None:
@@ -155,7 +160,6 @@ def lookup_cep(zip_code: str) -> CEPAddressData | None:
 
 
 def _lookup_viacep(zip_code: str) -> CEPAddressData | None:
-    """Look up via ViaCEP API."""
     url = f"https://viacep.com.br/ws/{zip_code}/json/"
     try:
         response = httpx.get(url, timeout=5)
@@ -179,7 +183,6 @@ def _lookup_viacep(zip_code: str) -> CEPAddressData | None:
 
 
 def _lookup_brasilapi(zip_code: str) -> CEPAddressData | None:
-    """Look up via BrasilAPI (fallback)."""
     url = f"https://brasilapi.com.br/api/cep/v1/{zip_code}"
     try:
         response = httpx.get(url, timeout=5)
@@ -210,10 +213,7 @@ def format_price_cents(cents: int) -> str:
     return f"R$ {formatted}"
 
 
-def _build_cache_key(package: PackageData) -> str:
-    from .config import get_correios_config
-
-    config = get_correios_config()
+def _build_cache_key(package: PackageData, config) -> str:
     components = [
         config.cep_origem,
         package.destination_zip_code,

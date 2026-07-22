@@ -10,11 +10,19 @@ class FreightConfigurationError(FreightError):
 
 
 class FreightAuthenticationError(FreightError):
-    """Correios authentication failed."""
+    """Correios authentication failed (401, 403)."""
+
+
+class FreightTimeoutError(FreightError):
+    """Correios API timed out."""
+
+
+class FreightConnectionError(FreightError):
+    """Network error connecting to Correios API."""
 
 
 class FreightProviderUnavailable(FreightError):
-    """Correios API is unavailable or timed out."""
+    """Correios API returned an unexpected HTTP error or is unavailable."""
 
 
 class FreightValidationError(FreightError):

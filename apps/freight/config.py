@@ -1,111 +1,169 @@
-"""Centralized Correios configuration."""
+"""Centralized Correios configuration — simplified.
+
+Only 6 environment variables are required:
+  CORREIOS_USUARIO
+  CORREIOS_CODIGO_ACESSO
+  CORREIOS_CARTAO_POSTAGEM
+  CORREIOS_CONTRATO
+  CORREIOS_CNPJ
+  CORREIOS_CEP_ORIGEM
+
+All other behaviours (timeouts, product codes, limits) are internal constants.
+"""
+import re
+import logging
 from dataclasses import dataclass
 
 from django.conf import settings
 
 from .exceptions import FreightConfigurationError
 
-_CEP_REQUIRED_MESSAGE = "CEP de origem dos Correios precisa ter 8 digitos."
+logger = logging.getLogger("apps.freight")
+
+_CEP_RE = re.compile(r"^\d{8}$")
+_CNPJ_RE = re.compile(r"^\d{14}$")
 _PLACEHOLDER_PATTERNS = ("configure-no", "troque", "seu-", "gere-um")
 
+# ── internal constants (never from env) ──────────────────────────────────────
+
+REQUEST_TIMEOUT_SECONDS = 10
+TOKEN_CACHE_MARGIN_SECONDS = 300
+DEFAULT_FALLBACK_LENGTH_CM = "20"
+DEFAULT_FALLBACK_WIDTH_CM = "20"
+DEFAULT_FALLBACK_HEIGHT_CM = "20"
+
+TOKEN_URL = "https://api.correios.com.br/token/v1/autentica"
+TOKEN_URL_CARTAO = "https://api.correios.com.br/token/v1/autentica/cartaopostagem"
+MEU_CONTRATO_URL = "https://api.correios.com.br/meucontrato/v1"
+PRICE_URL = "https://api.correios.com.br/preco/v1/nacional"
+DEADLINE_URL = "https://api.correios.com.br/prazo/v1/nacional"
+
+DEFAULT_PRODUCTS = ["03298", "03220"]
+
+PRODUCT_LABELS = {
+    "03298": "PAC",
+    "03220": "SEDEX",
+}
+
+
+# ── dataclass ────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class CorreiosConfig:
-    enabled: bool
     usuario: str
     codigo_acesso: str
     cartao_postagem: str
     contrato: str
-    dr: str
     cnpj: str
     cep_origem: str
-    pac_product_code: str
-    sedex_product_code: str
-    connect_timeout: float
-    read_timeout: float
-    token_cache_margin_seconds: int
-    allow_estimate_fallback: bool
-    default_length_cm: int
-    default_width_cm: int
-    default_height_cm: int
 
+
+# ── factory ──────────────────────────────────────────────────────────────────
 
 def get_correios_config() -> CorreiosConfig:
-    """Build CorreiosConfig from Django settings.
+    """Build validated CorreiosConfig from Django settings.
 
-    Validates required fields when CORREIOS_ENABLED is true.
+    Only 6 env vars are consumed.  Old variables (CORREIOS_DR,
+    CORREIOS_ENABLED, CORREIOS_PAC_PRODUCT_CODE, etc) are ignored
+    with a single warning.
     """
-    enabled = getattr(settings, "CORREIOS_ENABLED", False)
+    _warn_legacy_vars()
 
     config = CorreiosConfig(
-        enabled=enabled,
-        usuario=(getattr(settings, "CORREIOS_USUARIO", "") or "").strip(),
-        codigo_acesso=(getattr(settings, "CORREIOS_CODIGO_ACESSO", "") or "").strip(),
-        cartao_postagem=(getattr(settings, "CORREIOS_CARTAO_POSTAGEM", "") or "").strip(),
-        contrato=(getattr(settings, "CORREIOS_CONTRATO", "") or "").strip(),
-        dr=(getattr(settings, "CORREIOS_DR", "") or "").strip(),
-        cnpj=(getattr(settings, "CORREIOS_CNPJ", "") or "").strip(),
-        cep_origem=(getattr(settings, "CORREIOS_CEP_ORIGEM", "") or "").strip(),
-        pac_product_code=(getattr(settings, "CORREIOS_PAC_PRODUCT_CODE", "03298") or "").strip(),
-        sedex_product_code=(getattr(settings, "CORREIOS_SEDEX_PRODUCT_CODE", "03220") or "").strip(),
-        connect_timeout=float(getattr(settings, "CORREIOS_CONNECT_TIMEOUT_SECONDS", 5)),
-        read_timeout=float(getattr(settings, "CORREIOS_READ_TIMEOUT_SECONDS", 15)),
-        token_cache_margin_seconds=int(getattr(settings, "CORREIOS_TOKEN_CACHE_MARGIN_SECONDS", 300)),
-        allow_estimate_fallback=bool(getattr(settings, "CORREIOS_ALLOW_ESTIMATE_FALLBACK", False)),
-        default_length_cm=int(getattr(settings, "CORREIOS_DEFAULT_LENGTH_CM", 20)),
-        default_width_cm=int(getattr(settings, "CORREIOS_DEFAULT_WIDTH_CM", 20)),
-        default_height_cm=int(getattr(settings, "CORREIOS_DEFAULT_HEIGHT_CM", 20)),
+        usuario=_clean_str(getattr(settings, "CORREIOS_USUARIO", "")),
+        codigo_acesso=_clean_str(getattr(settings, "CORREIOS_CODIGO_ACESSO", "")),
+        cartao_postagem=_digits_only(getattr(settings, "CORREIOS_CARTAO_POSTAGEM", "")),
+        contrato=_digits_only(getattr(settings, "CORREIOS_CONTRATO", "")),
+        cnpj=_digits_only(getattr(settings, "CORREIOS_CNPJ", "")),
+        cep_origem=_digits_only(getattr(settings, "CORREIOS_CEP_ORIGEM", "")),
     )
 
-    if not enabled:
-        return config
+    return config
 
+
+def is_correios_configured(config: CorreiosConfig) -> bool:
+    """True when the three mandatory fields are present."""
+    return bool(config.usuario and config.codigo_acesso and config.cep_origem)
+
+
+# ── validators ───────────────────────────────────────────────────────────────
+
+def validate_correios_config(config: CorreiosConfig) -> None:
+    """Raise FreightConfigurationError if config is incomplete or invalid."""
     if not config.usuario:
         raise FreightConfigurationError("CORREIOS_USUARIO nao configurado.")
 
     if not config.codigo_acesso:
         raise FreightConfigurationError("CORREIOS_CODIGO_ACESSO nao configurado.")
 
-    if not config.cep_origem or not _is_valid_cep(config.cep_origem):
-        raise FreightConfigurationError(_CEP_REQUIRED_MESSAGE)
+    if not config.cep_origem or not _CEP_RE.match(config.cep_origem):
+        raise FreightConfigurationError(
+            "CORREIOS_CEP_ORIGEM invalido. Precisa ter exatamente 8 digitos."
+        )
 
-    if not config.pac_product_code:
-        raise FreightConfigurationError("CORREIOS_PAC_PRODUCT_CODE nao configurado.")
+    if config.cnpj and not _CNPJ_RE.match(config.cnpj):
+        raise FreightConfigurationError(
+            "CORREIOS_CNPJ precisa ter 14 digitos."
+        )
 
-    if not config.sedex_product_code:
-        raise FreightConfigurationError("CORREIOS_SEDEX_PRODUCT_CODE nao configurado.")
-
-    if config.cnpj and len(config.cnpj) != 14:
-        raise FreightConfigurationError("CORREIOS_CNPJ precisa ter 14 digitos.")
-
-    if config.connect_timeout <= 0:
-        raise FreightConfigurationError("CORREIOS_CONNECT_TIMEOUT_SECONDS deve ser positivo.")
-
-    if config.read_timeout <= 0:
-        raise FreightConfigurationError("CORREIOS_READ_TIMEOUT_SECONDS deve ser positivo.")
-
-    for field_name, value in [
+    for name, value in [
         ("CORREIOS_USUARIO", config.usuario),
         ("CORREIOS_CODIGO_ACESSO", config.codigo_acesso),
     ]:
-        _reject_placeholder(value, field_name)
-
-    return config
+        _reject_placeholder(value, name)
 
 
-def _is_valid_cep(cep: str) -> bool:
-    return len(cep) == 8 and cep.isdigit()
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _clean_str(value: str) -> str:
+    return (value or "").strip()
 
 
-def _reject_placeholder(value: str, field_name: str) -> None:
+def _digits_only(value: str) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def _reject_placeholder(value: str, name: str) -> None:
     lower = value.lower()
     for pattern in _PLACEHOLDER_PATTERNS:
         if pattern in lower:
             raise FreightConfigurationError(
-                f"{field_name} parece conter um placeholder. "
+                f"{name} parece conter um placeholder. "
                 "Configure a credencial real dos Correios."
             )
 
+
+_LEGACY_VARS = [
+    "CORREIOS_ENABLED",
+    "CORREIOS_DR",
+    "CORREIOS_PAC_PRODUCT_CODE",
+    "CORREIOS_SEDEX_PRODUCT_CODE",
+    "CORREIOS_CONNECT_TIMEOUT_SECONDS",
+    "CORREIOS_READ_TIMEOUT_SECONDS",
+    "CORREIOS_TOKEN_CACHE_MARGIN_SECONDS",
+    "CORREIOS_ALLOW_ESTIMATE_FALLBACK",
+    "CORREIOS_DEFAULT_LENGTH_CM",
+    "CORREIOS_DEFAULT_WIDTH_CM",
+    "CORREIOS_DEFAULT_HEIGHT_CM",
+]
+
+_legacy_warned = False
+
+
+def _warn_legacy_vars() -> None:
+    global _legacy_warned
+    if _legacy_warned:
+        return
+    found = [v for v in _LEGACY_VARS if getattr(settings, v, None)]
+    if found:
+        logger.warning(
+            "Variáveis antigas dos Correios detectadas e ignoradas: %s",
+            ", ".join(sorted(found)),
+        )
+    _legacy_warned = True
+
+
+# ── package presets (UI) ─────────────────────────────────────────────────────
 
 PACKAGE_PRESETS = [
     {
