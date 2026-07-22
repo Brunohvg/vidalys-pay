@@ -24,6 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     <link rel="stylesheet" href="{% static 'css/pwa-install.css' %}">
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <div class="offline-banner" id="offlineBanner">Sem conexão</div>
@@ -37,7 +38,7 @@
     </header>
 
     <main class="content">
-        <p class="greeting">Olá, {{ seller.name }}</p>
+        {% block greeting %}<p class="greeting">Olá, {{ seller.name }}</p>{% endblock %}
         {% block content %}{% endblock %}
     </main>
 

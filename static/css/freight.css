@@ -1,0 +1,599 @@
+/* Vidalys Pay — Frete v2 */
+
+/* === PAGE WRAPPER === */
+.freight-page {
+    padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+}
+
+/* === HEADER === */
+.freight-header {
+    margin-bottom: var(--space-5);
+}
+
+.freight-header__title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--vidalys-navy);
+    line-height: 1.2;
+    letter-spacing: -0.3px;
+}
+
+.freight-header__desc {
+    font-size: 0.9375rem;
+    color: var(--color-gray-500);
+    margin-top: var(--space-1);
+    line-height: 1.4;
+}
+
+/* === PROGRESS INDICATOR === */
+.freight-progress {
+    margin-bottom: var(--space-5);
+}
+
+.freight-progress__bar {
+    height: 4px;
+    background: var(--color-gray-200);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: var(--space-2);
+}
+
+.freight-progress__fill {
+    height: 100%;
+    background: var(--vidalys-blue);
+    border-radius: 2px;
+    transition: width 0.35s ease;
+}
+
+.freight-progress__steps {
+    display: flex;
+    justify-content: space-between;
+}
+
+.freight-progress__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: var(--text-xs);
+    color: var(--color-gray-400);
+    font-weight: 500;
+    min-width: 56px;
+}
+
+.freight-progress__step--active {
+    color: var(--vidalys-blue);
+    font-weight: 600;
+}
+
+.freight-progress__step--completed {
+    color: var(--vidalys-green);
+}
+
+.freight-progress__step-number {
+    display: none;
+}
+
+/* === MAIN CARD === */
+.freight-card {
+    background: var(--color-white);
+    border-radius: 20px;
+    padding: var(--space-6);
+    box-shadow: 0 2px 12px rgba(7, 27, 74, 0.05);
+    margin-bottom: var(--space-4);
+}
+
+/* === CEP FORM === */
+.freight-cep__label {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    margin-bottom: var(--space-3);
+}
+
+.freight-cep__input {
+    width: 100%;
+    height: 52px;
+    padding: 0 var(--space-4);
+    border: 1.5px solid var(--color-gray-300);
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
+    font-family: var(--font-sans);
+    color: var(--color-gray-950);
+    background: var(--color-white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    margin-bottom: var(--space-3);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.freight-cep__input:focus {
+    outline: none;
+    border-color: var(--vidalys-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 255, 0.10);
+}
+
+.freight-cep__input::placeholder {
+    color: var(--color-gray-400);
+}
+
+.freight-cep__button {
+    width: 100%;
+    height: 52px;
+    padding: 0 var(--space-5);
+    background: var(--vidalys-blue);
+    color: var(--color-white);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    transition: background 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.freight-cep__button:hover {
+    background: #1d4ed8;
+}
+
+.freight-cep__button:active {
+    transform: scale(0.98);
+    background: #1b46c0;
+}
+
+.freight-cep__button:disabled {
+    background: var(--color-gray-300);
+    color: var(--color-gray-500);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.freight-cep__button-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.freight-cep__spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--color-white);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: none;
+}
+
+.freight-cep__button.loading .freight-cep__spinner {
+    display: block;
+}
+
+.freight-cep__button.loading .freight-cep__button-text {
+    display: none;
+}
+
+.freight-cep__button.loading .freight-cep__button-icon {
+    display: none;
+}
+
+/* === ERROR BLOCK === */
+.freight-error {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+}
+
+.freight-error__body {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.freight-error__icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--color-danger);
+}
+
+.freight-error__message {
+    font-size: 0.875rem;
+    color: #991b1b;
+    line-height: 1.5;
+    flex: 1;
+}
+
+.freight-error__retry {
+    align-self: flex-end;
+    padding: var(--space-2) var(--space-4);
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: #991b1b;
+    cursor: pointer;
+    min-height: 36px;
+    transition: background 0.15s;
+}
+
+.freight-error__retry:hover {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+/* === ADDRESS CARD === */
+.freight-address {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.freight-address__preview {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+}
+
+.freight-address__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 200, 150, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.freight-address__icon svg {
+    color: var(--vidalys-green);
+}
+
+.freight-address__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.freight-address__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--vidalys-navy);
+    margin-bottom: var(--space-1);
+}
+
+.freight-address__street,
+.freight-address__neighborhood {
+    font-size: 0.875rem;
+    color: var(--color-gray-700);
+    line-height: 1.5;
+}
+
+.freight-address__city {
+    font-size: 0.875rem;
+    color: var(--color-gray-700);
+    line-height: 1.5;
+}
+
+.freight-address__zip {
+    font-size: var(--text-xs);
+    color: var(--color-gray-500);
+    margin-top: var(--space-1);
+}
+
+.freight-address__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.freight-address__actions .btn-primary {
+    width: 100%;
+    min-height: 48px;
+    font-size: 0.9375rem;
+}
+
+.freight-address__actions .btn-secondary {
+    width: 100%;
+    min-height: 44px;
+}
+
+/* === PACKAGE SECTION === */
+.freight-package {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.freight-package__label {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    margin-bottom: var(--space-3);
+}
+
+.freight-package__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+}
+
+@media (max-width: 359px) {
+    .freight-package__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.freight-package__item {
+    padding: var(--space-3) var(--space-4);
+    border: 1.5px solid var(--color-gray-300);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    background: var(--color-white);
+    transition: all 0.15s;
+    text-align: left;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.freight-package__item:hover {
+    border-color: var(--vidalys-blue);
+}
+
+.freight-package__item.selected {
+    background: rgba(37, 99, 255, 0.05);
+    border-color: var(--vidalys-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 255, 0.08);
+}
+
+.freight-package__item-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--vidalys-navy);
+}
+
+.freight-package__item.selected .freight-package__item-name {
+    color: var(--vidalys-blue);
+}
+
+.freight-package__item-detail {
+    font-size: var(--text-xs);
+    color: var(--color-gray-500);
+    line-height: 1.3;
+}
+
+.freight-package__summary {
+    font-size: var(--text-xs);
+    color: var(--color-gray-500);
+    margin-top: var(--space-1);
+    min-height: 1.2em;
+}
+
+/* Custom fields */
+.freight-package__custom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.freight-package__dims {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-3);
+}
+
+.freight-package__dims .form-group {
+    margin-bottom: 0;
+}
+
+/* === RESULTS === */
+.freight-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-top: var(--space-2);
+}
+
+.freight-results__heading {
+    font-size: var(--text-sm);
+    color: var(--color-gray-500);
+    margin-bottom: var(--space-1);
+}
+
+.freight-result-card {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: 0 2px 12px rgba(7, 27, 74, 0.05);
+}
+
+.freight-result-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.freight-result-card__name {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--vidalys-navy);
+}
+
+.freight-result-card__badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.freight-result-card__badge--official {
+    background: rgba(0, 200, 150, 0.1);
+    color: var(--vidalys-green);
+}
+
+.freight-result-card__badge--estimated {
+    background: rgba(245, 158, 11, 0.12);
+    color: #92400e;
+}
+
+.freight-result-card__price {
+    font-size: 1.625rem;
+    font-weight: 700;
+    color: var(--vidalys-navy);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: var(--space-1);
+}
+
+.freight-result-card__deadline {
+    font-size: 0.875rem;
+    color: var(--color-gray-500);
+    margin-bottom: var(--space-3);
+}
+
+.freight-result-card__error {
+    font-size: 0.875rem;
+    color: var(--color-danger);
+    margin-bottom: var(--space-3);
+}
+
+.freight-result-card__action {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-white);
+    border: 1.5px solid var(--vidalys-green);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: var(--vidalys-green);
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+}
+
+.freight-result-card__action:hover {
+    background: rgba(0, 200, 150, 0.05);
+}
+
+.freight-result-card__action:active {
+    background: rgba(0, 200, 150, 0.1);
+}
+
+/* Results bottom actions */
+.freight-results__actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+}
+
+.freight-results__actions .btn-secondary {
+    flex: 1;
+    min-width: 0;
+}
+
+/* === GENERIC OVERRIDES (keep these scoped) === */
+.freight-page .btn-primary {
+    width: 100%;
+    min-height: 48px;
+}
+
+.freight-page .form-group {
+    margin-bottom: var(--space-4);
+}
+
+.freight-page .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Soften global focus-visible on freight */
+.freight-page :focus-visible {
+    outline: none;
+}
+
+.freight-page .freight-cep__input:focus-visible {
+    outline: none;
+}
+
+/* === RESPONSIVE === */
+
+/* Tablet+ */
+@media (min-width: 768px) {
+    .freight-header__title {
+        font-size: 1.875rem;
+    }
+
+    .freight-page {
+        max-width: 640px;
+        margin: 0 auto;
+    }
+
+    .freight-address__actions {
+        flex-direction: row;
+    }
+
+    .freight-address__actions .btn-primary {
+        flex: 1;
+    }
+
+    .freight-address__actions .btn-secondary {
+        width: auto;
+        padding-left: var(--space-5);
+        padding-right: var(--space-5);
+    }
+
+    .freight-package__grid {
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    }
+
+    .freight-result-card {
+        max-width: 640px;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+    .freight-page {
+        max-width: 580px;
+    }
+}
+
+/* Smallest phones */
+@media (max-width: 359px) {
+    .freight-card {
+        padding: var(--space-4);
+        border-radius: var(--radius-lg);
+    }
+
+    .freight-header__title {
+        font-size: 1.5rem;
+    }
+
+    .freight-result-card__price {
+        font-size: 1.375rem;
+    }
+}
