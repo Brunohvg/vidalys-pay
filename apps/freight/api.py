@@ -2,7 +2,8 @@
 import logging
 
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -25,6 +26,8 @@ logger = logging.getLogger("apps.freight")
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @rate_limit(max_requests=20, window_seconds=60)
 @seller_login_required
 def calculate_freight_view(request: Request) -> Response:
@@ -60,7 +63,7 @@ def calculate_freight_view(request: Request) -> Response:
         )
 
     logger.info(
-        "Calculo de frete: seller=%s cep=%s*** weight=%d",
+        "seller_authenticated=true seller_id=%s freight_calculate_started=true cep=%s*** weight=%d",
         seller.id,
         destination_zip_code[:5],
         int(weight_grams),

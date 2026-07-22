@@ -154,7 +154,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 window.location.href = '/app/sucesso/?link_id=' + data.data.id;
             } else {
-                showError(data.error?.message || 'Não foi possível criar o link. Tente novamente.');
+                const msg = typeof data.error?.message === 'string'
+                    ? data.error.message
+                    : (typeof data.detail === 'string' ? data.detail : 'Não foi possível criar o link. Tente novamente.');
+                showError(msg);
             }
         } catch (err) {
             if (!navigator.onLine) {

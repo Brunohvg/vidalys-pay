@@ -301,12 +301,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 lastResult = data.data;
                 showResult(data.data);
             } else {
-                const msg = data.error?.message || 'Erro ao calcular frete.';
+                const rawMsg = typeof data.error?.message === 'string'
+                    ? data.error.message
+                    : (typeof data.detail === 'string' ? data.detail : 'Erro ao calcular frete.');
                 if (data.error?.field_errors) {
                     const fields = Object.values(data.error.field_errors).flat().join(' ');
-                    showError(fields || msg);
+                    showError(fields || rawMsg);
                 } else {
-                    showError(msg);
+                    showError(rawMsg);
                 }
             }
         } catch (err) {

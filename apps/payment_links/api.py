@@ -1,8 +1,10 @@
 """Payment links API — DRF views with seller session and API key auth."""
 import contextlib
+import logging
 
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -12,6 +14,8 @@ from apps.integrations.auth import authenticate_api_key
 from .models import PaymentLink
 from .use_cases import create_payment_link, format_currency
 
+logger = logging.getLogger("apps.payment_links")
+
 
 def _get_seller(request: Request):
     """Get seller from session or validate API key.
@@ -20,6 +24,11 @@ def _get_seller(request: Request):
     """
     # Try seller session first
     seller = getattr(request, "seller", None)
+    if seller is None:
+        # Try underlying Django HttpRequest (DRF Request wraps it)
+        inner = getattr(request, "_request", None)
+        if inner is not None:
+            seller = getattr(inner, "seller", None)
     if seller is not None:
         return seller, None
 
@@ -45,12 +54,14 @@ def _get_seller(request: Request):
             )
 
     return None, Response(
-        {"error": {"code": "unauthorized", "message": "Autenticação inválida."}},
+        {"error": {"code": "seller_not_authenticated", "message": "Sua sessão expirou. Entre novamente."}},
         status=status.HTTP_401_UNAUTHORIZED,
     )
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @rate_limit(max_requests=30, window_seconds=60)
 def create_payment_link_view(request: Request) -> Response:
     """Create a new payment link.
@@ -62,6 +73,11 @@ def create_payment_link_view(request: Request) -> Response:
     seller, error = _get_seller(request)
     if error:
         return error
+
+    logger.info(
+        "seller_authenticated=true seller_id=%s pagarme_call_started=false",
+        seller.id,
+    )
 
     # Get idempotency key
     idempotency_key = request.headers.get("Idempotency-Key")
@@ -117,6 +133,11 @@ def create_payment_link_view(request: Request) -> Response:
         except (TypeError, ValueError):
             expires_in_minutes = None
 
+    logger.info(
+        "seller_authenticated=true seller_id=%s pagarme_call_started=true",
+        seller.id,
+    )
+
     # Execute use case
     result = create_payment_link(
         seller=seller,
@@ -168,6 +189,8 @@ def create_payment_link_view(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def list_payment_links_view(request: Request) -> Response:
     """List payment links with cursor pagination and filters.
 
@@ -229,6 +252,8 @@ def list_payment_links_view(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def get_payment_link_view(request: Request, link_id: str) -> Response:
     """Get payment link details with attempts and timeline."""
     seller, error = _get_seller(request)
@@ -290,6 +315,8 @@ def get_payment_link_view(request: Request, link_id: str) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def resend_payment_link_view(request: Request, link_id: str) -> Response:
     """Resend payment link via WhatsApp."""
     seller, error = _get_seller(request)
