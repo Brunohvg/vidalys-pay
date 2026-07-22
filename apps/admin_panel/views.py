@@ -177,6 +177,13 @@ def create_seller(request):
             "form_data": {"name": name, "phone": whatsapp, "max_amount": max_amount},
         })
 
+    if Seller.objects.filter(whatsapp_phone=whatsapp).exists():
+        return render(request, "panel/sellers/create.html", {
+            "active_page": "create_seller",
+            "error": "Já existe um vendedor com este número de WhatsApp.",
+            "form_data": {"name": name, "phone": whatsapp, "max_amount": max_amount},
+        })
+
     try:
         max_amount_cents = int(float(max_amount) * 100) if max_amount else 50000
     except (ValueError, TypeError):
