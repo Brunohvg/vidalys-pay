@@ -88,6 +88,7 @@ def dashboard(request):
         "pending_invitations": active_invitations,
         "recent_sellers": recent,
         "webhook_url": webhook_url,
+        "today": timezone.now(),
     })
 
 
