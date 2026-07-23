@@ -27,7 +27,8 @@ Copie e cole cada variável no painel do Coolify.
 |----------|-------|
 | `DATABASE_URL` | `postgresql://USUARIO:SENHA@HOST:5432/vidalys_pay` |
 
-> **IMPORTANTE:** Substitua USUARIO, SENHA e HOST pelas credenciais do seu banco PostgreSQL externo.
+> **IMPORTANTE:** copie a **Internal URL** atual exibida no recurso PostgreSQL.
+> Não monte o hostname manualmente e não reutilize a URL de um banco recriado.
 
 ### Grupo 3: Pagar.me
 
@@ -89,6 +90,10 @@ O Coolify detectará automaticamente dois serviços:
 
 1. **web** — Servidor principal (Gunicorn)
 2. **worker** — Worker de notificações
+
+Se o PostgreSQL foi criado como outro recurso/stack, ative **Connect to
+Predefined Network** na aplicação. O Compose não declara redes personalizadas:
+o Coolify gerencia a rede e o DNS entre recursos.
 
 ### 4. Configurar Domínio
 
@@ -200,9 +205,12 @@ Antes do deploy, você precisa:
 
 ### Erro de Conexão com Banco
 
-- Verificar `DATABASE_URL`
-- Verificar se o PostgreSQL está acessível
-- Verificar firewall
+- Se aparecer `failed to resolve host`, copie novamente a **Internal URL** do
+  recurso PostgreSQL para `DATABASE_URL`
+- Ative **Connect to Predefined Network** na aplicação
+- Confirme que aplicação e banco estão no mesmo servidor/destination
+- Faça novo deploy dos serviços `web` e `worker`
+- Não aumente `DB_WAIT_MAX_ATTEMPTS`: falha de DNS não é corrigida por retry
 
 ### Webhook não funciona
 

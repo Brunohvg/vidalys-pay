@@ -150,6 +150,20 @@ Isso indica que não havia boleto, link nem referência interna da Vidalys Pay e
 portanto, o evento foi removido intencionalmente. A política e o roteiro de teste
 estão em `docs/WEBHOOKS.md`.
 
+### PostgreSQL: hostname não resolve
+
+O erro `failed to resolve host` ocorre antes do Django e indica falha de DNS
+interno, geralmente por `DATABASE_URL` antiga ou recursos em redes separadas.
+
+1. Abra o recurso PostgreSQL no Coolify e copie a **Internal URL** atual.
+2. Substitua `DATABASE_URL` na aplicação sem alterar manualmente o hostname.
+3. Ative **Connect to Predefined Network** na aplicação.
+4. Confirme que aplicação e banco usam o mesmo servidor/destination.
+5. Faça novo deploy; não aumente tentativas como solução.
+
+O Compose não deve declarar a rede `coolify` manualmente. O script
+`docker/wait_for_database.py` imprime esse diagnóstico sem expor credenciais.
+
 ### Erro de migrations
 
 **Causa:** Migrations pendentes ou conflito.

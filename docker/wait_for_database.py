@@ -12,6 +12,11 @@ import psycopg
 MAX_ATTEMPTS = int(os.getenv("DB_WAIT_MAX_ATTEMPTS", "60"))
 INTERVAL_SECONDS = int(os.getenv("DB_WAIT_INTERVAL_SECONDS", "2"))
 CONNECT_TIMEOUT_SECONDS = int(os.getenv("DB_CONNECT_TIMEOUT_SECONDS", "5"))
+DNS_ERROR_MARKERS = (
+    "failed to resolve host",
+    "name or service not known",
+    "temporary failure in name resolution",
+)
 
 
 def _mask_url(database_url: str) -> str:
@@ -31,6 +36,11 @@ def _normalize_url(database_url: str) -> str:
             f"Received: {_mask_url(database_url) if '://' in database_url else database_url[:30]}"
         )
     return database_url
+
+
+def _is_dns_error(error: str) -> bool:
+    lowered = error.lower()
+    return any(marker in lowered for marker in DNS_ERROR_MARKERS)
 
 
 def wait_for_database(database_url: str) -> None:
@@ -54,6 +64,13 @@ def wait_for_database(database_url: str) -> None:
                 f"{masked} indisponível. "
                 f"Motivo: {last_error[:120]}"
             )
+            if attempt == 1 and _is_dns_error(last_error):
+                print(
+                    "[db-wait] DIAGNÓSTICO: o hostname do PostgreSQL não resolve. "
+                    "No Coolify, habilite 'Connect to Predefined Network' na "
+                    "aplicação e substitua DATABASE_URL pela Internal URL atual "
+                    "exibida no recurso PostgreSQL."
+                )
         except Exception as exc:
             last_error = str(exc).strip().replace("\n", " | ")
             print(
@@ -70,6 +87,11 @@ def wait_for_database(database_url: str) -> None:
         f"{MAX_ATTEMPTS} tentativas ({masked}). "
         f"Último erro: {last_error[:200]}"
     )
+    if _is_dns_error(last_error):
+        print(
+            "[db-wait] AÇÃO: revise a rede gerenciada pelo Coolify e a Internal "
+            "URL do banco; aumentar tentativas não corrige falha de DNS."
+        )
     sys.exit(1)
 
 

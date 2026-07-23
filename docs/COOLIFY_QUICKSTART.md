@@ -53,11 +53,13 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 1. Criar projeto no Coolify
 2. Conectar repositório GitHub
-3. Configurar domínio `pay.vidalys.com.br`
-4. Inserir variáveis
-5. Deploy
-6. Criar superusuário
-7. Testar `https://pay.vidalys.com.br/health/`
+3. Copiar a **Internal URL** atual do PostgreSQL para `DATABASE_URL`
+4. Ativar **Connect to Predefined Network** se o banco for outro recurso
+5. Configurar domínio `pay.vidalys.com.br`
+6. Inserir variáveis
+7. Deploy
+8. Criar superusuário
+9. Testar `https://pay.vidalys.com.br/health/`
 
 ## Links Úteis
 
