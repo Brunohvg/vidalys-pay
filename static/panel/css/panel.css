@@ -369,14 +369,14 @@ body{color:var(--ink)}
    Keeps the full panel readable on common notebook screens without nested
    navigation scrolling or oversized cards. */
 @media(min-width:1024px){
-  .admin-sidebar{width:232px}
-  .admin-main{margin-left:232px}
-  .admin-sidebar__brand{padding:18px 18px 14px}
-  .admin-sidebar__brand img{width:30px;height:30px}
-  .admin-sidebar__brand-text{font-size:.96rem}
-  .admin-sidebar__nav{padding:8px 10px;gap:2px;overflow-y:visible}
-  .admin-sidebar__section{padding:13px 10px 4px}
-  .admin-sidebar__link{min-height:38px;padding:8px 10px;font-size:.77rem}
+  .admin-sidebar{width:220px}
+  .admin-main{margin-left:220px}
+  .admin-sidebar__brand{padding:20px 18px 16px}
+  .admin-sidebar__brand img{width:32px;height:32px}
+  .admin-sidebar__brand-text{font-size:1rem}
+  .admin-sidebar__nav{padding:10px;gap:2px;overflow-y:visible}
+  .admin-sidebar__section{padding:15px 10px 5px;font-size:.62rem;color:rgba(255,255,255,.38)}
+  .admin-sidebar__link{min-height:40px;padding:9px 10px;font-size:.8rem}
   .admin-sidebar__footer{padding:12px 16px}
   .admin-sidebar__avatar{width:31px;height:31px}
   .admin-sidebar__logout{margin-top:5px;padding:4px 0}
@@ -423,7 +423,7 @@ body{color:var(--ink)}
 .panel-directory__toolbar{padding:16px 16px 0}
 .panel-directory>.panel-filters{padding:11px 16px 13px}
 .panel-directory .panel-table td{padding-top:12px;padding-bottom:12px}
-.panel-form-layout{grid-template-columns:minmax(0,650px) 280px;gap:16px}
+.panel-form-layout{grid-template-columns:minmax(0,1fr) 280px;gap:16px;width:100%;max-width:1000px;margin-inline:auto}
 .panel-form-heading{padding-bottom:16px;margin-bottom:17px}
 .panel-form-actions{padding-top:16px}
 .panel-help-card{padding:19px;border-radius:15px}

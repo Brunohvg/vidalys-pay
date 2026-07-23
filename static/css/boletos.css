@@ -942,6 +942,18 @@
 }
 
 @media (min-width: 1024px) {
+    .admin-body .boleto-metrics {
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+    }
+
+    .admin-body .boleto-metric {
+        grid-column: span 2;
+    }
+
+    .admin-body .boleto-metric--value {
+        grid-column: span 5;
+    }
+
     .admin-body .boleto-list-card {
         grid-template-columns: minmax(220px, 1.45fr) minmax(120px, .5fr) minmax(250px, 1fr) auto;
         gap: 16px;
