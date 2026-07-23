@@ -1,4 +1,4 @@
-﻿"""Base settings for Vidalys Pay."""
+"""Base settings for Vidalys Pay."""
 import os
 from pathlib import Path
 

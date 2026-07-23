@@ -78,6 +78,21 @@ WORKER_POLL_SECONDS=3
 MAX_NOTIFICATION_ATTEMPTS=5
 ```
 
+### Web Push (opcional)
+
+Para habilitar notificações de pagamento no PWA, configure o mesmo par VAPID
+nos serviços `web` e `worker`:
+
+```bash
+WEBPUSH_VAPID_PUBLIC_KEY=chave-publica-base64url
+WEBPUSH_VAPID_PRIVATE_KEY=chave-privada
+WEBPUSH_VAPID_SUBJECT=mailto:contato@vidalys.com.br
+```
+
+As chaves formam um par permanente da instalação. Não troque apenas uma delas:
+uma rotação exige configurar o novo par e os vendedores autorizarem uma nova
+assinatura. A chave privada deve ficar somente no gerenciador de secrets.
+
 ## Docker Compose
 
 ```yaml

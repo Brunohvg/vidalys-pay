@@ -1,4 +1,4 @@
-﻿"""Outbox worker â€” processes pending notifications.
+"""Outbox worker â€” processes pending notifications.
 
 Uses SELECT ... FOR UPDATE SKIP LOCKED for safe concurrent processing.
 """

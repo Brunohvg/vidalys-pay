@@ -1,4 +1,4 @@
-﻿"""Web Push subscriptions and delivery service."""
+"""Web Push subscriptions and delivery service."""
 import json
 import logging
 
@@ -19,11 +19,15 @@ EVENT_CONTENT = {
     "payment_chargedback": ("Chargeback recebido", "O pagamento do link {reference} recebeu um chargeback."),
 }
 
+DELIVERED_SUBSCRIPTIONS_KEY = "_delivered_subscription_ids"
+
 
 def queue_payment_status_push(*, payment_link: PaymentLink, event_type: str, dedup_suffix: str = "") -> bool:
     """Queue one push event per link status without performing network I/O."""
     content = EVENT_CONTENT.get(event_type)
-    if not content or not settings.WEBPUSH_VAPID_PRIVATE_KEY:
+    if not content or not (
+        settings.WEBPUSH_VAPID_PUBLIC_KEY and settings.WEBPUSH_VAPID_PRIVATE_KEY
+    ):
         return False
     title, body_template = content
     amount = _format_brl(payment_link.amount_cents)
@@ -60,12 +64,16 @@ def send_push_outbox_item(item) -> bool:
         logger.error("pywebpush não está instalado")
         return False
 
+    delivered_ids = set(item.payload.get(DELIVERED_SUBSCRIPTIONS_KEY, []))
     subscriptions = PushSubscription.objects.filter(
         seller_id=item.payload.get("seller_id"),
         is_active=True,
-    ).exclude(last_delivery_key=item.deduplication_key)
+    ).exclude(id__in=delivered_ids)
     transient_failure = False
-    payload = json.dumps(item.payload, ensure_ascii=False)
+    public_payload = {
+        key: value for key, value in item.payload.items() if not key.startswith("_")
+    }
+    payload = json.dumps(public_payload, ensure_ascii=False)
 
     for subscription in subscriptions.iterator():
         try:
@@ -82,6 +90,9 @@ def send_push_outbox_item(item) -> bool:
             subscription.last_delivery_key = item.deduplication_key
             subscription.failure_count = 0
             subscription.save(update_fields=["last_delivery_key", "failure_count", "updated_at"])
+            delivered_ids.add(str(subscription.id))
+            item.payload[DELIVERED_SUBSCRIPTIONS_KEY] = sorted(delivered_ids)
+            item.save(update_fields=["payload"])
         except WebPushException as exc:
             status_code = getattr(getattr(exc, "response", None), "status_code", None)
             if status_code in (404, 410):
@@ -97,6 +108,10 @@ def send_push_outbox_item(item) -> bool:
                 logger.warning("Falha Web Push assinatura=%s status=%s", subscription.id, status_code)
         except Exception:
             logger.exception("Erro inesperado no Web Push assinatura=%s", subscription.id)
+            subscription.failure_count += 1
+            if subscription.failure_count >= 5:
+                subscription.is_active = False
+            subscription.save(update_fields=["failure_count", "is_active", "updated_at"])
             transient_failure = True
 
     return not transient_failure
@@ -105,4 +120,3 @@ def send_push_outbox_item(item) -> bool:
 def _format_brl(cents: int) -> str:
     value = cents / 100
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-

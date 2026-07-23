@@ -1,4 +1,4 @@
-﻿"""Seller URL patterns."""
+"""Seller URL patterns."""
 from django.urls import path
 
 from . import push_api, views

@@ -62,6 +62,9 @@ Copie e cole cada variável no painel do Coolify.
 | `GUNICORN_WORKERS` | `3` |
 | `WORKER_POLL_SECONDS` | `3` |
 | `MAX_NOTIFICATION_ATTEMPTS` | `5` |
+| `WEBPUSH_VAPID_PUBLIC_KEY` | `[CHAVE_PUBLICA_VAPID]` |
+| `WEBPUSH_VAPID_PRIVATE_KEY` | `[CHAVE_PRIVADA_VAPID]` (secret) |
+| `WEBPUSH_VAPID_SUBJECT` | `mailto:contato@vidalys.com.br` |
 
 ## Passos para Deploy no Coolify
 

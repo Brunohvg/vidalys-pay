@@ -1,4 +1,4 @@
-﻿"""Notification and outbox models."""
+"""Notification and outbox models."""
 from django.db import models
 
 from apps.core.models import UUIDModel

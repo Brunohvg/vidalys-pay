@@ -57,6 +57,9 @@
 | GUNICORN_WORKERS | 3 | Workers do Gunicorn |
 | WORKER_POLL_SECONDS | 3 | Intervalo do worker |
 | MAX_NOTIFICATION_ATTEMPTS | 5 | Máximo de tentativas |
+| WEBPUSH_VAPID_PUBLIC_KEY | vazio | Chave pública Web Push |
+| WEBPUSH_VAPID_PRIVATE_KEY | vazio | Chave privada Web Push (secret) |
+| WEBPUSH_VAPID_SUBJECT | mailto:contato@vidalys.com.br | Contato VAPID |
 | INVITATION_EXPIRATION_HOURS | 24 | Validade do convite |
 | SELLER_SESSION_DAYS | 30 | Validade da sessão |
 

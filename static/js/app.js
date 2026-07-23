@@ -1,4 +1,4 @@
-﻿/* Vidalys Pay — Seller App Runtime v4 */
+/* Vidalys Pay — Seller App Runtime v4 */
 (function () {
     'use strict';
 

@@ -118,6 +118,9 @@ docker compose up --build
 | `EVOLUTION_INSTANCE` | Nome da instância | Sim |
 | `INVITATION_TOKEN_PEPPER` | Pepper para hash de convites | Sim |
 | `API_KEY_PEPPER` | Pepper para hash de API keys | Sim |
+| `WEBPUSH_VAPID_PUBLIC_KEY` | Chave pública VAPID (Web Push) | Para push |
+| `WEBPUSH_VAPID_PRIVATE_KEY` | Chave privada VAPID; manter em segredo | Para push |
+| `WEBPUSH_VAPID_SUBJECT` | Contato VAPID (`mailto:` ou URL HTTPS) | Não |
 
 Veja `.env.example` para todas as variáveis.
 
@@ -220,6 +223,7 @@ docker compose exec web python manage.py createsuperuser
 | `GUNICORN_TIMEOUT` | `60` | Timeout do Gunicorn (segundos) |
 | `WORKER_POLL_SECONDS` | `3` | Intervalo de polling do worker |
 | `MAX_NOTIFICATION_ATTEMPTS` | `5` | Tentativas máximas por notificação |
+| `WEBPUSH_VAPID_SUBJECT` | `mailto:contato@vidalys.com.br` | Contato do responsável pelo Web Push |
 | `DB_WAIT_MAX_ATTEMPTS` | `60` | Tentativas de espera pelo banco |
 | `DB_WAIT_INTERVAL_SECONDS` | `2` | Intervalo entre tentativas |
 | `DB_CONNECT_TIMEOUT_SECONDS` | `5` | Timeout de conexão com o banco |

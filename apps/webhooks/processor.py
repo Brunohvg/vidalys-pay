@@ -1,4 +1,4 @@
-﻿"""Webhook event processor â€” maps events to state transitions."""
+"""Webhook event processor â€” maps events to state transitions."""
 import logging
 
 from django.db import transaction
@@ -141,6 +141,9 @@ def _handle_create_attempt(event, payment_link, config, normalized):
         from django.db import transaction as txn
         txn.on_commit(lambda: queue_payment_approved(
             seller=payment_link.seller, payment_link=payment_link,
+        ))
+        txn.on_commit(lambda: queue_payment_status_push(
+            payment_link=payment_link, event_type="payment_paid",
         ))
 
     if config.get("attempt_status") == "CHARGEDBACK":

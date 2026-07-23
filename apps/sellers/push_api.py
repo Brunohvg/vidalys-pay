@@ -1,5 +1,6 @@
-﻿"""Authenticated Web Push subscription endpoints for the seller app."""
+"""Authenticated Web Push subscription endpoints for the seller app."""
 import json
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -8,6 +9,9 @@ from django.views.decorators.http import require_http_methods
 from apps.notifications.models import PushSubscription
 
 from .decorators import seller_login_required
+
+MAX_ENDPOINT_LENGTH = 4096
+MAX_KEY_LENGTH = 512
 
 
 @seller_login_required
@@ -26,6 +30,13 @@ def push_subscriptions(request):
     endpoint = str(payload.get("endpoint", "")).strip()
     if not endpoint:
         return JsonResponse({"error": "Assinatura não informada."}, status=400)
+    parsed_endpoint = urlparse(endpoint)
+    if (
+        len(endpoint) > MAX_ENDPOINT_LENGTH
+        or parsed_endpoint.scheme != "https"
+        or not parsed_endpoint.netloc
+    ):
+        return JsonResponse({"error": "Endpoint da assinatura inválido."}, status=400)
     if request.method == "DELETE":
         PushSubscription.objects.filter(seller=request.seller, endpoint=endpoint).update(is_active=False)
         return JsonResponse({}, status=204)
@@ -34,6 +45,8 @@ def push_subscriptions(request):
     auth = str(keys.get("auth", "")).strip()
     if not p256dh or not auth:
         return JsonResponse({"error": "Chaves da assinatura não informadas."}, status=400)
+    if len(p256dh) > MAX_KEY_LENGTH or len(auth) > MAX_KEY_LENGTH:
+        return JsonResponse({"error": "Chaves da assinatura inválidas."}, status=400)
     if not settings.WEBPUSH_VAPID_PUBLIC_KEY or not settings.WEBPUSH_VAPID_PRIVATE_KEY:
         return JsonResponse({"error": "Notificações ainda não foram configuradas."}, status=503)
     subscription, created = PushSubscription.objects.update_or_create(

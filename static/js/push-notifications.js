@@ -1,4 +1,4 @@
-﻿/* Vidalys Pay — Web Push controller */
+/* Vidalys Pay — Web Push controller */
 (function () {
     'use strict';
     var button;
@@ -77,8 +77,14 @@
             }
             var registration = await navigator.serviceWorker.ready;
             subscription = await registration.pushManager.getSubscription();
-            if (Notification.permission === 'denied') setState('denied');
-            else setState(subscription ? 'enabled' : 'disabled');
+            if (Notification.permission === 'denied') {
+                setState('denied');
+            } else if (subscription) {
+                await api('POST', subscription.toJSON());
+                setState('enabled');
+            } else {
+                setState('disabled');
+            }
         } catch (error) {
             setState('unavailable', error.message);
         }

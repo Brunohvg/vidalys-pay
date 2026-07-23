@@ -52,8 +52,12 @@ Responsável por:
 Responsável por:
 - Templates de mensagens
 - Outbox de notificações
-- Worker de envio
+- Worker de envio (WhatsApp e Web Push)
 - Status de entrega
+
+O Web Push usa VAPID e mantém uma assinatura por perfil de navegador. Eventos de
+pagamento entram no mesmo outbox das demais notificações; no retry, o worker
+preserva os aparelhos que já receberam para não duplicar a entrega.
 
 ### Integrations (`apps.integrations`)
 
