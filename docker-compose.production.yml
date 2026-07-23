@@ -12,6 +12,7 @@ services:
       # === APLICAÇÃO ===
       SECRET_KEY: ${SECRET_KEY:?}
       DEBUG: "false"
+      DJANGO_SETTINGS_MODULE: config.settings.production
       ALLOWED_HOSTS: pay.vidalys.com.br,localhost,127.0.0.1
       CSRF_TRUSTED_ORIGINS: https://pay.vidalys.com.br
       APP_BASE_URL: https://pay.vidalys.com.br
@@ -58,6 +59,11 @@ services:
       start_period: 60s
 
     restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   worker:
     build:
@@ -67,3 +73,8 @@ services:
     command: ["python", "manage.py", "run_outbox_worker"]
     environment: *app_env
     restart: unless-stopped
+    stop_grace_period: 5m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

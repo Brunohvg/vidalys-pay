@@ -1,8 +1,9 @@
 .git
 .gitignore
+.github
+.dockerignore
 .env
 .env.*
-!.env.example
 *.pyc
 __pycache__
 .pytest_cache
@@ -11,8 +12,13 @@ htmlcov
 staticfiles
 node_modules
 *.md
-!README.md
 .venv
 venv
 .vscode
 .idea
+tests
+vidalys_pay_documentacao_final
+docker-compose*.yml
+pyproject.toml
+uv.lock
+requirements-dev.txt

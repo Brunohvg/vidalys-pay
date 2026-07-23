@@ -19,7 +19,8 @@ COPY . .
 
 RUN chmod +x /app/docker/entrypoint-web.sh && \
     chmod +x /app/docker/entrypoint-worker.sh && \
-    chown -R appuser:appuser /app
+    mkdir -p /app/staticfiles && \
+    chown appuser:appuser /app/staticfiles
 
 USER appuser
 
