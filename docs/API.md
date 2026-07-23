@@ -273,6 +273,21 @@ Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASI
 `duplicate` só será `true` quando a primeira entrega tiver sido retida. Um
 evento externo descartado será avaliado e descartado novamente se for reenviado.
 
+### Encargos dos boletos emitidos
+
+A emissão empresarial feita pelas telas do Vidalys Pay envia por padrão:
+
+```json
+{
+  "instructions": "Após o vencimento: multa de 2% e juros de mora de 1% ao mês.",
+  "interest": {"days": 1, "type": "percentage", "amount": 1},
+  "fine": {"days": 1, "type": "percentage", "amount": 2}
+}
+```
+
+Esses campos pertencem a `payments[].boleto` na criação de order do Pagar.me.
+A funcionalidade requer conta Pagar.me na modalidade PSP.
+
 ### Health Check
 
 **GET** `/health/`

@@ -31,6 +31,25 @@ Em timeout ou resultado incerto, o boleto fica em `CREATION_UNKNOWN`. Não se
 deve emitir outro boleto automaticamente: aguarde o webhook ou faça a
 reconciliação operacional.
 
+### Encargos após o vencimento
+
+Todos os novos boletos são enviados ao Pagar.me com:
+
+- instrução impressa: `Após o vencimento: multa de 2% e juros de mora de 1% ao mês.`;
+- multa percentual de 2%, a partir do primeiro dia após o vencimento;
+- juros percentuais de 1% ao mês, a partir do primeiro dia após o vencimento.
+
+Os campos usados na API V5 são `payments[].boleto.instructions`,
+`payments[].boleto.fine` e `payments[].boleto.interest`. O Pagar.me limita juros
+e multa a clientes PSP (liquidação pelo próprio Pagar.me). Contas Gateway podem
+rejeitar a emissão; confirme a modalidade da conta antes do teste em produção.
+
+O teto de 2% para multa está previsto expressamente para relações de consumo. A
+taxa de juros aplicável pode variar conforme contrato e natureza da obrigação;
+por isso o sistema usa o padrão conservador de 1% ao mês e não apresenta essa
+taxa como um “máximo legal” universal. Mudanças de percentual exigem validação
+jurídica e alteração revisada no cliente Pagar.me.
+
 ## Rotas
 
 | Perfil | Rota | Uso |
@@ -126,6 +145,15 @@ Em produção, `CNPJ_LOOKUP_BASE_URL` e `APP_BASE_URL` devem usar HTTPS.
 4. Reprocesse o evento correspondente no Admin.
 5. Não crie outra tentativa com nova chave sem confirmar a inexistência da
    cobrança anterior.
+
+### Pagar.me rejeita juros ou multa
+
+1. Confirme com o Pagar.me se a conta usa integração PSP.
+2. Consulte o erro 4xx e os logs do serviço `web` pelo marcador
+   `boleto_creation_provider_error=true`.
+3. Não remova silenciosamente os encargos apenas para concluir o deploy.
+4. Valide a modalidade da conta em sandbox e em produção, pois as afiliações
+   podem ser diferentes.
 
 ### Webhook sem boleto
 

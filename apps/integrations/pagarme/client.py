@@ -17,6 +17,13 @@ from .credentials import (
 
 logger = logging.getLogger("apps.integrations.pagarme")
 
+BOLETO_LATE_PAYMENT_INSTRUCTIONS = (
+    "Após o vencimento: multa de 2% e juros de mora de 1% ao mês."
+)
+BOLETO_INTEREST_PERCENT_MONTHLY = 1
+BOLETO_FINE_PERCENT = 2
+BOLETO_LATE_FEE_START_DAYS = 1
+
 
 class PagarmeError(Exception):
     def __init__(self, status_code: int, error_data: dict):
@@ -188,10 +195,22 @@ class PagarmeClient:
         customer: dict[str, Any],
         metadata: dict[str, str],
         idempotency_key: str,
-        instructions: str = "",
+        instructions: str = BOLETO_LATE_PAYMENT_INSTRUCTIONS,
     ) -> dict[str, Any]:
         """Create a Pagar.me V5 order paid by boleto."""
-        boleto: dict[str, Any] = {"due_at": f"{due_date}T23:59:59Z"}
+        boleto: dict[str, Any] = {
+            "due_at": f"{due_date}T23:59:59Z",
+            "interest": {
+                "days": BOLETO_LATE_FEE_START_DAYS,
+                "type": "percentage",
+                "amount": BOLETO_INTEREST_PERCENT_MONTHLY,
+            },
+            "fine": {
+                "days": BOLETO_LATE_FEE_START_DAYS,
+                "type": "percentage",
+                "amount": BOLETO_FINE_PERCENT,
+            },
+        }
         if instructions:
             boleto["instructions"] = instructions[:255]
 

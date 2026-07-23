@@ -129,7 +129,21 @@ def test_pagarme_client_uses_existing_auth_and_idempotency_header(settings, prov
     assert kwargs["headers"]["Authorization"].startswith("Basic ")
     assert kwargs["headers"]["Idempotency-Key"] == "logical-attempt-123"
     assert kwargs["json"]["payments"][0]["payment_method"] == "boleto"
-    assert kwargs["json"]["payments"][0]["boleto"]["due_at"] == "2026-08-10T23:59:59Z"
+    boleto_payload = kwargs["json"]["payments"][0]["boleto"]
+    assert boleto_payload["due_at"] == "2026-08-10T23:59:59Z"
+    assert boleto_payload["instructions"] == (
+        "Após o vencimento: multa de 2% e juros de mora de 1% ao mês."
+    )
+    assert boleto_payload["interest"] == {
+        "days": 1,
+        "type": "percentage",
+        "amount": 1,
+    }
+    assert boleto_payload["fine"] == {
+        "days": 1,
+        "type": "percentage",
+        "amount": 2,
+    }
     assert kwargs["json"]["customer"]["type"] == "company"
     assert kwargs["json"]["customer"]["document_type"] == "CNPJ"
     assert kwargs["json"]["metadata"]["internal_boleto_id"] == "internal-123"

@@ -121,7 +121,6 @@ def create_boleto(
                 "reference": boleto.internal_reference,
             },
             idempotency_key=idempotency_key,
-            instructions="Não receber após o vencimento.",
         )
     except PagarmeError as exc:
         logger.warning(

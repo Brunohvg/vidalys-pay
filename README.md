@@ -15,6 +15,7 @@ O **Vidalys Pay** é uma aplicação interna para vendedores criarem links de pa
 
 - Criação de links de pagamento (1x, 2x, 3x sem juros)
 - Emissão e acompanhamento de boletos empresariais por CNPJ
+- Boletos com multa de 2% e juros de mora de 1% ao mês após o vencimento
 - Consulta de CNPJ com autopreenchimento e revisão antes da emissão
 - Envio automático via WhatsApp
 - Acompanhamento em tempo real via webhooks
@@ -198,15 +199,17 @@ vidalys-pay/
 ### Pré-requisitos
 
 - PostgreSQL criado ou selecionado no Coolify
-- Aplicação e banco na mesma rede interna (`coolify`)
+- Aplicação conectada à rede predefinida do Coolify quando o PostgreSQL estiver
+  em outro recurso
 
 ### Passo a passo
 
-1. **Configure o PostgreSQL** no Coolify e copie a URL interna de conexão (formato `postgresql://usuario:senha@host-interno:5432/nome-do-banco`)
-2. **Conecte o repositório** ao Coolify e selecione **Docker Compose**
-3. **Configure o domínio** no serviço `web`, porta `8000`
-4. **Preencha as variáveis de ambiente** (veja tabela abaixo)
-5. **Deploy**
+1. **Configure o PostgreSQL** no Coolify e copie a **Internal URL** atual
+2. **Ative `Connect to Predefined Network`** na aplicação quando o banco estiver em outro recurso/stack
+3. **Conecte o repositório** ao Coolify e selecione **Docker Compose**
+4. **Configure o domínio** no serviço `web`, porta `8000`
+5. **Preencha as variáveis de ambiente** (veja tabela abaixo)
+6. **Deploy**
 
 Após o primeiro deploy, crie o superusuário:
 
@@ -269,7 +272,8 @@ curl -s https://pay.vidalys.com.br/health/ready/
 - **Nunca** use `localhost` como host do banco de dados
 - **Nunca** defina `DB_HOST`, `DB_PORT`, `POSTGRES_USER` — use apenas `DATABASE_URL`
 - O banco PostgreSQL é externo, gerenciado pelo Coolify
-- A rede `coolify` deve ser externa (`external: true`) no compose
+- Não declare uma rede `coolify` manualmente no Compose; use a rede gerenciada
+  e a opção `Connect to Predefined Network` do Coolify
 
 Veja `RUNBOOK.md` para procedimentos operacionais.
 O fluxo completo de boletos está documentado em [`docs/BOLETOS.md`](docs/BOLETOS.md).
