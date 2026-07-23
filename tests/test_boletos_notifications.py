@@ -15,7 +15,7 @@ from apps.notifications.whatsapp_service import (
     queue_boleto_created,
     queue_boleto_status,
 )
-from apps.sellers.models import Selle
+from apps.sellers.models import Seller
 from apps.webhooks.models import WebhookEvent
 from apps.webhooks.processor import process_webhook_event
 

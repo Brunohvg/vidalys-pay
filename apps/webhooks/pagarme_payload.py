@@ -19,8 +19,8 @@ class FailureReason:
 @dataclass(frozen=True)
 class NormalizedEvent:
     """Normalized webhook event from Pagar.me."""
-    event_id: st
-    event_type: st
+    event_id: str
+    event_type: str
     resource_type: str = ""
     payment_link_id: str | None = None
     checkout_id: str | None = None

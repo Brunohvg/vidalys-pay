@@ -12,7 +12,7 @@ from django.utils import timezone
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.boletos.services.webhook_processing import ALLOWED_TRANSITIONS
 from apps.notifications.models import NotificationOutbox, WhatsAppMessage
-from apps.sellers.models import Selle
+from apps.sellers.models import Seller
 from apps.webhooks.models import ProcessingStatus, WebhookEvent
 from apps.webhooks.pagarme_payload import normalize_event
 from apps.webhooks.processor import process_webhook_event

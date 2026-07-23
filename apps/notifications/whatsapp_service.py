@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import transaction
 
-from apps.sellers.models import Selle
+from apps.sellers.models import Seller
 
 from .models import NotificationOutbox, RecipientType, WhatsAppMessage, WhatsAppMessageStatus
 from .templates_msg import (
@@ -67,7 +67,7 @@ def queue_payment_link_created(
     results = []
     customer_phone = getattr(payment_link, "customer_phone", None) or None
 
-    # 1. Always queue for selle
+    # 1. Always queue for seller
     text = payment_link_created_message(
         reference=payment_link.reference,
         customer_name=payment_link.customer_name or None,
@@ -102,7 +102,7 @@ def queue_payment_link_created(
             recipient_phone="",
         ))
 
-    # 2. Optionally queue for custome
+    # 2. Optionally queue for customer
     if customer_phone:
         customer_text = payment_link_created_message(
             reference=payment_link.reference,
@@ -310,7 +310,7 @@ def _queue_message(
         existing_query = NotificationOutbox.objects.filter(deduplication_key=dedup_key)
         existing = (
             existing_query.first()
-            if deduplicate_foreve
+            if deduplicate_forever
             else existing_query.filter(status__in=["PENDING", "PROCESSING"]).first()
         )
 
