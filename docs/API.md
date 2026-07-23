@@ -4,6 +4,10 @@
 
 A API do Vidalys Pay segue REST com autenticação via sessão de vendedor ou API Key. Todas as respostas são JSON.
 
+O contrato legível por ferramentas está em [`openapi.json`](openapi.json). Toda
+resposta, inclusive de erro, contém `X-Request-ID`; informe esse valor ao suporte
+para localizar a requisição nos logs.
+
 ## Autenticação
 
 ### Sessão do Vendedor
@@ -23,6 +27,20 @@ Authorization: Bearer vly_live_xxxxx
 ```http
 Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD)
 ```
+
+### Matriz de acesso
+
+| Recurso | Sessão vendedor | Sessão admin | API Key / escopo |
+|---|---:|---:|---|
+| Criar link | Sim | Não | `payment_links:write` + `seller_id` |
+| Listar/detalhar link | Sim | Não | `payment_links:read` + `seller_id` |
+| Reenviar WhatsApp | Sim | Não | `notifications:write` + `seller_id` |
+| Consultar CNPJ | Sim | Superusuário | Não |
+| CEP e cálculo de frete | Sim | Não | Não |
+| Webhook Pagar.me | Não | Não | HTTP Basic próprio |
+
+A API Key representa uma integração, não um vendedor. Por isso `seller_id` é
+obrigatório no body da criação e na query string das leituras/reenvio.
 
 ## Endpoints
 
@@ -60,7 +78,7 @@ Idempotency-Key: 9c38991e-8bf4-4d19-89bc-f91f22bfef16
 | `amount_cents` | integer | Sim | Valor em centavos (> 0) |
 | `installments` | integer | Sim | Parcelas (1, 2 ou 3) |
 | `customer_name` | string | Não | Nome do cliente |
-| `customer_phone` | string | Não | Telefone E.164 |
+| `customer_phone` | string | Não | Telefone E.164 ou brasileiro com DDD; armazenado em E.164 |
 | `description` | string | Não | Descrição |
 | `expires_in_minutes` | integer | Não | Expiração em minutos (10-43200) |
 
@@ -77,8 +95,15 @@ Idempotency-Key: 9c38991e-8bf4-4d19-89bc-f91f22bfef16
     "status": "ACTIVE",
     "payment_url": "https://checkout.pagar.me/...",
     "expires_at": "2026-07-22T14:00:00Z",
-    "whatsapp_delivery": {
-      "status": "QUEUED"
+    "whatsapp": {
+      "seller": {
+        "status": "queued",
+        "message": "Envio para seu WhatsApp agendado."
+      },
+      "customer": {
+        "status": "queued",
+        "message": "Envio para o cliente agendado."
+      }
     },
     "created_at": "2026-07-21T14:00:00Z"
   }
@@ -220,11 +245,55 @@ Idempotency-Key: 9c38991e-8bf4-4d19-89bc-f91f22bfef16
 ```json
 {
   "data": {
-    "message_id": "019-...",
-    "status": "QUEUED"
+    "whatsapp": {
+      "seller": {"status": "queued", "message": "Envio para seu WhatsApp agendado."},
+      "customer": {"status": "not_requested", "message": "Cliente sem telefone informado."}
+    }
   }
 }
 ```
+
+A mesma `Idempotency-Key` nunca enfileira o mesmo reenvio duas vezes, mesmo se a
+primeira mensagem já tiver sido processada. Uma nova tentativa intencional deve
+usar uma chave nova. Na criação, a mesma chave só reutiliza o resultado quando
+todos os campos do payload são idênticos; qualquer diferença retorna `409`.
+
+### Consultar CNPJ
+
+**GET** `/api/v1/boletos/cnpj/{cnpj}/`
+
+Aceita CNPJ com ou sem máscara. Exige sessão ativa de vendedor ou sessão Django
+de superusuário. Retorna `400` para CNPJ inválido, `404` quando não encontrado,
+`503` quando o provedor está indisponível e `504` em timeout. Limite: 20/minuto.
+
+### Consultar CEP
+
+**POST** `/api/v1/freight/cep/`
+
+```json
+{"zip_code": "30140-071"}
+```
+
+Exige sessão de vendedor. A resposta contém `zip_code`, `street`,
+`neighborhood`, `city`, `state` e `source`. Limite: 30/minuto.
+
+### Calcular frete
+
+**POST** `/api/v1/freight/calculate/`
+
+```json
+{
+  "destination_zip_code": "30140-071",
+  "weight_grams": 500,
+  "length_cm": 20,
+  "width_cm": 15,
+  "height_cm": 10,
+  "declared_value_cents": 10000
+}
+```
+
+Exige sessão de vendedor. Retorna destino, pacote normalizado e opções com preço
+em centavos, prazo do provedor, dias adicionais e prazo final. Limite: 20/minuto.
 
 ### Webhook Pagar.me
 
@@ -332,11 +401,12 @@ A funcionalidade requer conta Pagar.me na modalidade PSP.
     "message": "Mensagem amigável",
     "field_errors": {
       "campo": ["Erro específico"]
-    },
-    "request_id": "req_01..."
+    }
   }
 }
 ```
+
+O identificador de rastreio fica no header `X-Request-ID`, não no corpo.
 
 ## Rate Limiting
 

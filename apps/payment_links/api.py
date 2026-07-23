@@ -1,5 +1,5 @@
 """Payment links API — DRF views with seller session and API key auth."""
-import contextlib
+import hashlib
 import logging
 
 from django.views.decorators.http import require_http_methods
@@ -13,6 +13,7 @@ from apps.core.rate_limit import rate_limit
 from apps.integrations.auth import authenticate_api_key, has_scope
 
 from .models import PaymentLink
+from .serializers import PaymentLinkCreateSerializer, PaymentLinkListQuerySerializer
 from .use_cases import create_payment_link, format_currency
 
 logger = logging.getLogger("apps.payment_links")
@@ -105,63 +106,10 @@ def create_payment_link_view(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Parse request body
-    data = request.data
-
-    # Validate required fields
-    reference = data.get("reference", "").strip()
-    if not reference:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Referência é obrigatória.", "field_errors": {"reference": ["Campo obrigatório."]}}},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if len(reference) > 80:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Referência deve ter no máximo 80 caracteres."}},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    amount_cents = data.get("amount_cents")
-    if amount_cents is None:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Valor é obrigatório.", "field_errors": {"amount_cents": ["Campo obrigatório."]}}},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    try:
-        amount_cents = int(amount_cents)
-    except (TypeError, ValueError):
-        return Response(
-            {"error": {"code": "validation_error", "message": "Valor inválido.", "field_errors": {"amount_cents": ["Deve ser um número inteiro."]}}},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    installments = data.get("installments", 1)
-    try:
-        installments = int(installments)
-    except (TypeError, ValueError):
-        installments = 1
-
-    # Optional fields
-    customer_name = data.get("customer_name") or None
-    customer_phone = data.get("customer_phone") or None
-    description = data.get("description") or None
-    field_limits = (("customer_name", customer_name, 120), ("customer_phone", customer_phone, 20), ("description", description, 255))
-    for field, value, max_length in field_limits:
-        if value is not None and (not isinstance(value, str) or len(value) > max_length):
-            return Response(
-                {"error": {"code": "validation_error", "message": f"{field} deve ser texto com no máximo {max_length} caracteres."}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-    expires_in_minutes = data.get("expires_in_minutes")
-
-    if expires_in_minutes is not None:
-        try:
-            expires_in_minutes = int(expires_in_minutes)
-            if expires_in_minutes < 10 or expires_in_minutes > 43200:
-                expires_in_minutes = None
-        except (TypeError, ValueError):
-            expires_in_minutes = None
+    serializer = PaymentLinkCreateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _validation_error(serializer.errors)
+    validated = serializer.validated_data
 
     logger.info(
         "seller_authenticated=true seller_id=%s pagarme_call_started=true",
@@ -171,14 +119,14 @@ def create_payment_link_view(request: Request) -> Response:
     # Execute use case
     result = create_payment_link(
         seller=seller,
-        reference=reference,
-        amount_cents=amount_cents,
-        installments=installments,
+        reference=validated["reference"],
+        amount_cents=validated["amount_cents"],
+        installments=validated["installments"],
         idempotency_key=idempotency_key,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
-        description=description,
-        expires_in_minutes=expires_in_minutes,
+        customer_name=validated["customer_name"] or None,
+        customer_phone=validated["customer_phone"] or None,
+        description=validated["description"] or None,
+        expires_in_minutes=validated["expires_in_minutes"],
     )
 
     if not result.success:
@@ -236,14 +184,13 @@ def list_payment_links_view(request: Request) -> Response:
     if error:
         return error
 
-    # Parse filters
-    status_filter = request.query_params.get("status", "")
-    cursor = request.query_params.get("cursor", "")
-    try:
-        limit = int(request.query_params.get("limit", 20))
-    except (TypeError, ValueError):
-        limit = 20
-    limit = max(1, min(limit, 100))
+    serializer = PaymentLinkListQuerySerializer(data=request.query_params)
+    if not serializer.is_valid():
+        return _validation_error(serializer.errors)
+    filters = serializer.validated_data
+    status_filter = filters["status"]
+    cursor = filters["cursor"]
+    limit = filters["limit"]
 
     # Build query
     links = PaymentLink.objects.filter(seller=seller)
@@ -253,8 +200,7 @@ def list_payment_links_view(request: Request) -> Response:
 
     # Cursor pagination
     if cursor:
-        with contextlib.suppress(Exception):
-            links = links.filter(created_at__lt=cursor)
+        links = links.filter(created_at__lt=cursor)
 
     links = links.order_by("-created_at")[: limit + 1]
 
@@ -382,6 +328,16 @@ def resend_payment_link_view(request: Request, link_id: str) -> Response:
             {"error": {"code": "missing_idempotency_key", "message": "Header Idempotency-Key é obrigatório."}},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    if len(idempotency_key) > 100:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Idempotency-Key deve ter no máximo 100 caracteres.",
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     try:
         link = PaymentLink.objects.get(id=link_id, seller=seller)
@@ -398,7 +354,13 @@ def resend_payment_link_view(request: Request, link_id: str) -> Response:
         )
 
     # Queue WhatsApp notifications (seller + optional customer)
-    whatsapp_status = _queue_whatsapp_notifications(seller=seller, payment_link=link)
+    deduplication_suffix = hashlib.sha256(idempotency_key.encode()).hexdigest()[:24]
+    whatsapp_status = _queue_whatsapp_notifications(
+        seller=seller,
+        payment_link=link,
+        deduplication_suffix=f"resend:{deduplication_suffix}",
+        deduplicate_forever=True,
+    )
 
     return Response(
         {
@@ -410,14 +372,25 @@ def resend_payment_link_view(request: Request, link_id: str) -> Response:
     )
 
 
-def _queue_whatsapp_notifications(*, seller, payment_link) -> dict:
+def _queue_whatsapp_notifications(
+    *,
+    seller,
+    payment_link,
+    deduplication_suffix: str = "",
+    deduplicate_forever: bool = False,
+) -> dict:
     """Queue WhatsApp notifications for seller and optionally customer.
 
     Returns a dict with separate statuses for each recipient.
     """
     from apps.notifications.whatsapp_service import queue_payment_link_created
 
-    results = queue_payment_link_created(seller=seller, payment_link=payment_link)
+    results = queue_payment_link_created(
+        seller=seller,
+        payment_link=payment_link,
+        deduplication_suffix=deduplication_suffix,
+        deduplicate_forever=deduplicate_forever,
+    )
 
     whatsapp = {}
     for result in results:
@@ -506,3 +479,20 @@ def _build_timeline(link, attempts):
     timeline.sort(key=lambda x: x["timestamp"])
 
     return timeline
+
+
+def _validation_error(errors) -> Response:
+    field_errors = {
+        field: [str(message) for message in messages]
+        for field, messages in errors.items()
+    }
+    return Response(
+        {
+            "error": {
+                "code": "validation_error",
+                "message": "Revise os campos informados.",
+                "field_errors": field_errors,
+            }
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )

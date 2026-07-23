@@ -186,6 +186,8 @@ vidalys-pay/
 | POST | `/api/v1/payment-links/{id}/resend/` | Reenviar link |
 | POST | `/api/v1/webhooks/pagarme/` | Webhook Pagar.me |
 | GET | `/api/v1/boletos/cnpj/{cnpj}/` | Consulta autenticada de CNPJ |
+| POST | `/api/v1/freight/cep/` | Consulta autenticada de CEP |
+| POST | `/api/v1/freight/calculate/` | Cálculo autenticado de frete |
 | GET | `/health/` | Health check |
 | GET | `/health/ready/` | Readiness check |
 
@@ -193,6 +195,10 @@ vidalys-pay/
 
 - **Sessão do vendedor:** Cookie HttpOnly
 - **API Key:** `Authorization: Bearer vly_live_xxxxx`
+
+Consulte [`docs/API.md`](docs/API.md) para exemplos, autenticação, escopos,
+idempotência e erros. O contrato OpenAPI 3.1 está em
+[`docs/openapi.json`](docs/openapi.json).
 
 ## Deploy no Coolify
 

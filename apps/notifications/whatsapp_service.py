@@ -59,6 +59,8 @@ def queue_payment_link_created(
     *,
     seller: Seller,
     payment_link,
+    deduplication_suffix: str = "",
+    deduplicate_forever: bool = False,
 ) -> list[WhatsAppDeliveryResult]:
     """Queue payment link created message to seller and optionally customer.
 
@@ -88,6 +90,8 @@ def queue_payment_link_created(
             payment_link=payment_link,
             recipient_phone=seller.whatsapp_phone,
             recipient_type=RecipientType.SELLER,
+            deduplication_suffix=deduplication_suffix,
+            deduplicate_forever=deduplicate_forever,
         )
         results.append(WhatsAppDeliveryResult(
             status="queued" if message else "duplicate",
@@ -123,6 +127,8 @@ def queue_payment_link_created(
             payment_link=payment_link,
             recipient_phone=customer_phone,
             recipient_type=RecipientType.CUSTOMER,
+            deduplication_suffix=deduplication_suffix,
+            deduplicate_forever=deduplicate_forever,
         )
         results.append(WhatsAppDeliveryResult(
             status="queued" if message else "duplicate",
@@ -297,6 +303,7 @@ def _queue_message(
     boleto=None,
     recipient_phone: str,
     recipient_type: str,
+    deduplication_suffix: str = "",
     deduplicate_forever: bool = False,
 ) -> WhatsAppMessage | None:
     """Create outbox entry and WhatsApp message record.
@@ -304,7 +311,8 @@ def _queue_message(
     Deduplication key includes: aggregate + event + recipient_type + phone.
     Returns None if a duplicate pending/processing message already exists.
     """
-    dedup_key = f"{aggregate_type}:{aggregate_id}:{event_type}:{recipient_type}:{recipient_phone}"
+    suffix = f":{deduplication_suffix}" if deduplication_suffix else ""
+    dedup_key = f"{aggregate_type}:{aggregate_id}:{event_type}:{recipient_type}:{recipient_phone}{suffix}"
 
     with transaction.atomic():
         existing_query = NotificationOutbox.objects.filter(deduplication_key=dedup_key)

@@ -96,6 +96,16 @@ def create_payment_link(
             error_message="Parcelamento deve ser 1x, 2x ou 3x.",
         )
 
+    creation_request = {
+        "reference": reference,
+        "amount_cents": amount_cents,
+        "installments": installments,
+        "customer_name": customer_name or "",
+        "customer_phone": customer_phone or "",
+        "description": description or "",
+        "expires_in_minutes": expires_in_minutes,
+    }
+
     # Check idempotency
     existing = PaymentLink.objects.filter(
         seller=seller,
@@ -104,11 +114,16 @@ def create_payment_link(
 
     if existing:
         # Same key, same payload = return existing
-        if (
-            existing.amount_cents == amount_cents
-            and existing.installments == installments
-            and existing.reference == reference
-        ):
+        existing_request = {
+            "reference": existing.reference,
+            "amount_cents": existing.amount_cents,
+            "installments": existing.installments,
+            "customer_name": existing.customer_name or "",
+            "customer_phone": existing.customer_phone or "",
+            "description": existing.description or "",
+            "expires_in_minutes": existing.creation_request.get("expires_in_minutes"),
+        }
+        if existing_request == creation_request:
             logger.info("Idempotência: reutilizando link existente %s", existing.id)
             return CreatePaymentLinkResult(payment_link=existing)
 
@@ -130,11 +145,7 @@ def create_payment_link(
         installments=installments,
         status=PaymentLinkStatus.CREATING,
         idempotency_key=idempotency_key,
-        creation_request={
-            "reference": reference,
-            "amount_cents": amount_cents,
-            "installments": installments,
-        },
+        creation_request=creation_request,
     )
 
     # Call Pagar.me

@@ -1,0 +1,132 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Vidalys Pay API",
+    "version": "1.0.0",
+    "description": "Contrato da API pública. Toda resposta inclui o header X-Request-ID."
+  },
+  "servers": [{"url": "https://pay.vidalys.br"}],
+  "paths": {
+    "/api/v1/payment-links/": {
+      "get": {
+        "summary": "Lista links de pagamento",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [
+          {"name": "seller_id", "in": "query", "schema": {"type": "string", "format": "uuid"}, "description": "Obrigatório com API Key."},
+          {"name": "status", "in": "query", "schema": {"$ref": "#/components/schemas/PaymentLinkStatus"}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string", "format": "date-time"}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}}
+        ],
+        "responses": {"200": {"description": "Lista paginada."}, "400": {"$ref": "#/components/responses/ValidationError"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}
+      },
+      "post": {
+        "summary": "Cria link de pagamento",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentLinkCreate"}}}},
+        "responses": {"201": {"description": "Criado."}, "202": {"description": "Resultado do provedor ainda incerto."}, "400": {"$ref": "#/components/responses/ValidationError"}, "409": {"description": "Chave reutilizada com payload diferente."}, "422": {"description": "Regra de negócio ou falha definitiva do provedor."}, "429": {"description": "Limite de 30 requisições por minuto excedido."}}
+      }
+    },
+    "/api/v1/payment-links/{link_id}/": {
+      "get": {
+        "summary": "Detalha um link",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/LinkId"}, {"$ref": "#/components/parameters/SellerId"}],
+        "responses": {"200": {"description": "Detalhes, tentativas, timeline e notificações."}, "404": {"description": "Não encontrado."}}
+      }
+    },
+    "/api/v1/payment-links/{link_id}/resend/": {
+      "post": {
+        "summary": "Reenvia o link por WhatsApp",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/LinkId"}, {"$ref": "#/components/parameters/SellerId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "responses": {"202": {"description": "Entrega enfileirada ou já deduplicada."}, "400": {"$ref": "#/components/responses/ValidationError"}, "404": {"description": "Não encontrado."}, "422": {"description": "Link sem URL."}}
+      }
+    },
+    "/api/v1/boletos/cnpj/{cnpj}/": {
+      "get": {
+        "summary": "Consulta dados cadastrais de CNPJ",
+        "security": [{"SellerSession": []}, {"DjangoSession": []}],
+        "parameters": [{"name": "cnpj", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Dados normalizados e indicador de cache."}, "400": {"$ref": "#/components/responses/ValidationError"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"description": "CNPJ não encontrado."}, "429": {"description": "Limite excedido."}, "502": {"description": "Provedor cadastral indisponível."}}
+      }
+    },
+    "/api/v1/freight/cep/": {
+      "post": {
+        "summary": "Consulta um CEP",
+        "security": [{"SellerSession": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["zip_code"], "properties": {"zip_code": {"type": "string"}}}}}},
+        "responses": {"200": {"description": "Endereço normalizado."}, "400": {"$ref": "#/components/responses/ValidationError"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "502": {"description": "Provedor indisponível."}}
+      }
+    },
+    "/api/v1/freight/calculate/": {
+      "post": {
+        "summary": "Calcula opções de frete",
+        "security": [{"SellerSession": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FreightCalculate"}}}},
+        "responses": {"200": {"description": "Opções de frete."}, "400": {"$ref": "#/components/responses/ValidationError"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "502": {"description": "Provedor indisponível."}}
+      }
+    },
+    "/api/v1/webhooks/pagarme/": {
+      "post": {
+        "summary": "Recebe eventos Pagar.me",
+        "security": [{"PagarmeBasic": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+        "responses": {"200": {"description": "Evento correlacionado aceito ou evento externo descartado sem persistência."}, "400": {"description": "Payload inválido."}, "401": {"description": "Credenciais inválidas."}}
+      }
+    },
+    "/health/": {"get": {"summary": "Liveness", "security": [], "responses": {"200": {"description": "Aplicação ativa."}}}},
+    "/health/ready/": {"get": {"summary": "Readiness", "security": [], "responses": {"200": {"description": "Banco e migrations prontos."}, "503": {"description": "Serviço ainda não pronto."}}}}
+  },
+  "components": {
+    "securitySchemes": {
+      "SellerSession": {"type": "apiKey", "in": "cookie", "name": "vidalys_seller_session"},
+      "DjangoSession": {"type": "apiKey", "in": "cookie", "name": "sessionid"},
+      "ApiKey": {"type": "http", "scheme": "bearer"},
+      "PagarmeBasic": {"type": "http", "scheme": "basic"}
+    },
+    "parameters": {
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "maxLength": 100}},
+      "LinkId": {"name": "link_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "SellerId": {"name": "seller_id", "in": "query", "schema": {"type": "string", "format": "uuid"}, "description": "Obrigatório com API Key."}
+    },
+    "responses": {
+      "ValidationError": {"description": "Campos inválidos.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Unauthorized": {"description": "Sessão ou credencial ausente/inválida."},
+      "Forbidden": {"description": "API Key sem o escopo necessário."}
+    },
+    "schemas": {
+      "PaymentLinkStatus": {"type": "string", "enum": ["CREATING", "ACTIVE", "PAID", "CANCELED", "REFUNDED", "EXPIRED", "CREATION_ERROR", "CREATION_UNKNOWN"]},
+      "PaymentLinkCreate": {
+        "type": "object",
+        "required": ["reference", "amount_cents", "installments"],
+        "properties": {
+          "seller_id": {"type": "string", "format": "uuid", "description": "Obrigatório com API Key."},
+          "reference": {"type": "string", "maxLength": 80},
+          "amount_cents": {"type": "integer", "minimum": 1},
+          "installments": {"type": "integer", "enum": [1, 2, 3]},
+          "customer_name": {"type": "string", "maxLength": 120},
+          "customer_phone": {"type": "string", "maxLength": 20, "description": "E.164 ou telefone brasileiro com DDD; normalizado para E.164."},
+          "description": {"type": "string", "maxLength": 255},
+          "expires_in_minutes": {"type": ["integer", "null"], "minimum": 10, "maximum": 43200}
+        }
+      },
+      "FreightCalculate": {
+        "type": "object",
+        "required": ["destination_zip_code", "weight_grams", "length_cm", "width_cm", "height_cm"],
+        "properties": {
+          "destination_zip_code": {"type": "string"},
+          "weight_grams": {"type": "integer", "minimum": 1},
+          "length_cm": {"type": "number", "exclusiveMinimum": 0},
+          "width_cm": {"type": "number", "exclusiveMinimum": 0},
+          "height_cm": {"type": "number", "exclusiveMinimum": 0}
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "field_errors": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}}}}
+      }
+    }
+  }
+}
