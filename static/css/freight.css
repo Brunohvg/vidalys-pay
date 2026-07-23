@@ -386,6 +386,48 @@
     }
 }
 
+/* Frete v3 — lightweight guided quote */
+.freight-page { max-width: 660px; margin-inline: auto; padding-bottom: 12px; }
+.freight-progress { margin: 0 0 14px; padding: 5px; border: 1px solid var(--app-line); border-radius: 14px; background: #fff; }
+.freight-progress__bar { display: none; }
+.freight-progress__steps { gap: 4px; }
+.freight-progress__step { flex: 1; min-width: 0; }
+.freight-progress__step-btn { width: 100%; min-width: 0; min-height: 38px; padding: 7px 5px; border-radius: 10px; font-size: .66rem; }
+.freight-progress__step--active .freight-progress__step-btn { background: #edf4ff; color: #175cd3; }
+.freight-progress__step--completed .freight-progress__step-btn { color: #16836c; }
+.freight-card { margin-bottom: 12px; padding: clamp(19px, 5vw, 28px); border: 1px solid var(--app-line); border-radius: 20px; box-shadow: var(--app-shadow); }
+.freight-cep__label,.freight-package__label { color: #344054; font-size: .78rem; font-weight: 650; }
+.freight-cep__input { height: 58px; margin-bottom: 10px; border-radius: 14px; background: #fbfcfe; font-size: 1.28rem; font-weight: 650; letter-spacing: .06em; text-align: center; }
+.freight-cep__button { height: 50px; border-radius: 13px; background: linear-gradient(105deg,#13c9d1,#2464ff); box-shadow: 0 8px 18px rgba(37,99,255,.16); }
+.freight-address__preview { padding: 14px; border-radius: 14px; background: #f7f9fc; }
+.freight-address__icon { border-radius: 13px; }
+.freight-address__actions { gap: 7px; }
+.freight-package { gap: 17px; }
+.freight-package__grid { gap: 8px; }
+.freight-package__item { position: relative; min-height: 72px; padding: 12px; border-color: #e1e6ee; border-radius: 13px; }
+.freight-package__item::before { content: "□"; color: #98a2b3; font-size: .8rem; }
+.freight-package__item.selected { border-color: #84adff; background: #f5f8ff; box-shadow: inset 0 0 0 1px #84adff; }
+.freight-package__item.selected::before { content: "✓"; color: #175cd3; font-weight: 700; }
+.freight-package__item-name { font-size: .75rem; }
+.freight-package__item-detail { font-size: .58rem; }
+.freight-declared-toggle { width: 100%; min-height: 43px; padding: 9px 11px; border-radius: 11px; background: #f7f9fc; }
+.freight-results { gap: 10px; }
+.freight-result-card { position: relative; padding: 18px; border: 1px solid var(--app-line); border-radius: 17px; box-shadow: var(--app-shadow); }
+.freight-result-card:has(.freight-result-card__badge--best) { border-color: #9de5d4; background: linear-gradient(145deg,#fff,#f5fffb); }
+.freight-result-card__name { font-size: .9rem; }
+.freight-result-card__price { margin: 10px 0 1px; font-size: 1.45rem; }
+.freight-result-card__deadline { margin-bottom: 12px; font-size: .7rem; }
+.freight-result-card__action { border-color: #d9e2ef; color: #175cd3; background: #f4f7ff; }
+.freight-results__heading { padding: 10px 13px; border-radius: 11px; background: #edf4ff; color: #475467; font-size: .68rem; }
+.freight-results__actions { flex-direction: column; gap: 7px; }
+.freight-results__actions .btn-primary,.freight-results__actions .btn-secondary { width: 100%; min-height: 48px; }
+
+@media (min-width: 768px) {
+    .freight-results { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .freight-result-card { max-width: none; }
+    .freight-results__actions { flex-direction: row; }
+}
+
 .freight-package__item {
     padding: var(--space-3) var(--space-4);
     border: 1.5px solid var(--color-gray-300);

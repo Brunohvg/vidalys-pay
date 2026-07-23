@@ -1,183 +1,128 @@
 ﻿{% extends "sellers/app_base.html" %}
 {% block title %}Criar link — Vidalys Pay{% endblock %}
 {% block page_title %}Novo link de pagamento{% endblock %}
-{% block page_description %}<p>Preencha os dados e gere uma cobrança em segundos.</p>{% endblock %}
+{% block page_description %}<p>Informe o valor e compartilhe em segundos.</p>{% endblock %}
 
 {% block content %}
-
-
-<div class="card">
-    <form id="createForm" method="post" action="/api/v1/payment-links/">
+<section class="create-link-card" aria-labelledby="create-link-value-title">
+    <form id="createForm" method="post" action="/api/v1/payment-links/" novalidate>
         {% csrf_token %}
-
-        <div class="form-group">
-            <label class="form-label" for="amount">Valor (R$)</label>
-            <div class="money-input-wrapper">
-                <span class="money-prefix">R$</span>
-                <input
-                    type="text"
-                    id="amount"
-                    name="amount_display"
-                    class="form-input money-input"
-                    placeholder="0,00"
-                    inputmode="decimal"
-                    required
-                    aria-describedby="amount-hint"
-                >
-                <input type="hidden" id="amount_cents" name="amount_cents">
+        <div class="create-link-value">
+            <label class="create-link-value__label" id="create-link-value-title" for="amount">Quanto você quer cobrar?</label>
+            <div class="create-link-value__input">
+                <span>R$</span>
+                <input type="text" id="amount" name="amount_display" placeholder="0,00" inputmode="decimal" required aria-describedby="amount-hint amount-error" autofocus>
             </div>
-            <span class="form-hint" id="amount-hint">Valor mínimo: R$ 1,00</span>
+            <input type="hidden" id="amount_cents" name="amount_cents">
+            <span class="create-link-value__hint" id="amount-hint">Valor mínimo de R$ 1,00</span>
+            <span class="create-link-field-error" id="amount-error" role="alert"></span>
         </div>
 
-        <div class="form-group">
-            <label class="form-label">Parcelamento</label>
+        <fieldset class="create-link-installments">
+            <legend>Parcelamento</legend>
             <div class="installments" role="radiogroup" aria-label="Número de parcelas">
-                <button type="button" class="option selected" data-value="1" role="radio" aria-checked="true">1x sem juros</button>
-                <button type="button" class="option" data-value="2" role="radio" aria-checked="false">2x sem juros</button>
-                <button type="button" class="option" data-value="3" role="radio" aria-checked="false">3x sem juros</button>
+                <button type="button" class="option selected" data-value="1" role="radio" aria-checked="true" tabindex="0"><strong>1x</strong><span>sem juros</span></button>
+                <button type="button" class="option" data-value="2" role="radio" aria-checked="false" tabindex="-1"><strong>2x</strong><span>sem juros</span></button>
+                <button type="button" class="option" data-value="3" role="radio" aria-checked="false" tabindex="-1"><strong>3x</strong><span>sem juros</span></button>
             </div>
             <input type="hidden" id="installments" name="installments" value="1">
+        </fieldset>
+
+        <div class="create-link-optional">
+            <button class="create-link-optional__toggle" id="customerToggle" type="button" aria-expanded="false" aria-controls="customerFields">
+                <span><strong>Adicionar dados do cliente</strong><small>Nome e telefone são opcionais</small></span>
+                <span class="create-link-optional__plus" aria-hidden="true">+</span>
+            </button>
+            <div class="create-link-optional__fields" id="customerFields" hidden>
+                <div class="form-group">
+                    <label class="form-label" for="customer_name">Nome do cliente</label>
+                    <input type="text" id="customer_name" name="customer_name" class="form-input" placeholder="Nome completo ou empresa" maxlength="120" autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="customer_phone">Telefone</label>
+                    <input type="tel" id="customer_phone" name="customer_phone" class="form-input" placeholder="(31) 99999-9999" maxlength="20" inputmode="tel" autocomplete="tel">
+                    <span class="form-hint">Usado somente para identificação ou comunicação.</span>
+                </div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label class="form-label" for="customer_name">Cliente <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
-            <input
-                type="text"
-                id="customer_name"
-                name="customer_name"
-                class="form-input"
-                placeholder="Nome do cliente"
-                maxlength="120"
-            >
-            <span class="form-hint">Nome completo ou nome da empresa</span>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="customer_phone">Telefone <span style="font-weight: 400; color: var(--color-gray-400);">(opcional)</span></label>
-            <input
-                type="tel"
-                id="customer_phone"
-                name="customer_phone"
-                class="form-input"
-                placeholder="(31) 99999-9999"
-                maxlength="20"
-                inputmode="tel"
-            >
-            <span class="form-hint">Utilizado somente quando necessário para identificação ou comunicação</span>
-        </div>
-
-        <button type="submit" class="btn-primary" id="submitBtn">
-            <span class="btn-text">Criar link de pagamento</span>
-            <span class="spinner"></span>
+        <div id="formError" class="alert alert--danger" role="alert" style="display:none"></div>
+        <button type="submit" class="btn-primary create-link-submit" id="submitBtn">
+            <span class="btn-text">Criar link de pagamento</span><span class="spinner"></span>
         </button>
+        <p class="create-link-secure">Link protegido e processado com segurança pela Pagar.me</p>
     </form>
-</div>
-
-<div id="formError" class="alert alert--danger" style="display: none;"></div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('createForm');
-    const amountInput = document.getElementById('amount');
-    const amountCents = document.getElementById('amount_cents');
-    const installmentsInput = document.getElementById('installments');
-    const submitBtn = document.getElementById('submitBtn');
-    const errorDiv = document.getElementById('formError');
+    var form = document.getElementById('createForm');
+    var amountInput = document.getElementById('amount');
+    var amountCents = document.getElementById('amount_cents');
+    var amountError = document.getElementById('amount-error');
+    var installmentsInput = document.getElementById('installments');
+    var installmentButtons = Array.from(document.querySelectorAll('.installments .option'));
+    var submitBtn = document.getElementById('submitBtn');
+    var errorDiv = document.getElementById('formError');
+    var customerToggle = document.getElementById('customerToggle');
+    var customerFields = document.getElementById('customerFields');
 
-    // Money formatting
-    amountInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/[^\d]/g, '');
-        if (value) {
-            value = (parseInt(value) / 100).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-        e.target.value = value;
-        amountCents.value = value ? Math.round(parseFloat(value.replace('.', '').replace(',', '.')) * 100) : '';
+    customerToggle.addEventListener('click', function() {
+        var expanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', String(!expanded));
+        customerFields.hidden = expanded;
+        if (!expanded) document.getElementById('customer_name').focus();
     });
 
-    // Installments selector
-    document.querySelectorAll('.installments .option').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.installments .option').forEach(b => {
-                b.classList.remove('selected');
-                b.setAttribute('aria-checked', 'false');
-            });
-            this.classList.add('selected');
-            this.setAttribute('aria-checked', 'true');
-            installmentsInput.value = this.dataset.value;
+    amountInput.addEventListener('input', function(e) {
+        var digits = e.target.value.replace(/[^\d]/g, '');
+        e.target.value = digits ? (parseInt(digits, 10) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+        amountCents.value = digits ? parseInt(digits, 10) : '';
+        amountError.textContent = '';
+        amountInput.removeAttribute('aria-invalid');
+    });
+
+    function selectInstallment(button) {
+        installmentButtons.forEach(function(item) {
+            var selected = item === button;
+            item.classList.toggle('selected', selected);
+            item.setAttribute('aria-checked', String(selected));
+            item.tabIndex = selected ? 0 : -1;
+        });
+        installmentsInput.value = button.dataset.value;
+        button.focus();
+    }
+    installmentButtons.forEach(function(button, index) {
+        button.addEventListener('click', function() { selectInstallment(button); });
+        button.addEventListener('keydown', function(event) {
+            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+            event.preventDefault();
+            var direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+            selectInstallment(installmentButtons[(index + direction + installmentButtons.length) % installmentButtons.length]);
         });
     });
 
-    // Form submission
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        errorDiv.style.display = 'none';
-
-        if (!amountCents.value || parseInt(amountCents.value) <= 0) {
-            showError('Informe um valor válido.');
-            return;
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault(); errorDiv.style.display = 'none';
+        if (!amountCents.value || parseInt(amountCents.value, 10) < 100) {
+            amountError.textContent = 'Informe um valor a partir de R$ 1,00.';
+            amountInput.setAttribute('aria-invalid', 'true'); amountInput.focus(); return;
         }
-
-        submitBtn.classList.add('loading');
-        submitBtn.disabled = true;
-
-        const now = new Date();
-        const refDate = now.getFullYear().toString() +
-            String(now.getMonth() + 1).padStart(2, '0') +
-            String(now.getDate()).padStart(2, '0');
-        const refRandom = Math.random().toString(36).slice(2, 6).toUpperCase();
-        const autoReference = refDate + '-' + refRandom;
-
-        const payload = {
-            reference: autoReference,
-            amount_cents: parseInt(amountCents.value),
-            installments: parseInt(installmentsInput.value),
-            customer_name: form.customer_name.value || null,
-            customer_phone: form.customer_phone.value || null,
-        };
-
+        submitBtn.classList.add('loading'); submitBtn.disabled = true;
+        var now = new Date();
+        var reference = now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+        var payload = {reference: reference, amount_cents: parseInt(amountCents.value, 10), installments: parseInt(installmentsInput.value, 10), customer_name: form.customer_name.value || null, customer_phone: form.customer_phone.value || null};
         try {
-            const idempotencyKey = crypto.randomUUID();
-            const response = await fetch('/api/v1/payment-links/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Idempotency-Key': idempotencyKey,
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                window.location.href = '/app/sucesso/?link_id=' + data.data.id;
-            } else {
-                const msg = typeof data.error?.message === 'string'
-                    ? data.error.message
-                    : (typeof data.detail === 'string' ? data.detail : 'Não foi possível criar o link. Tente novamente.');
-                showError(msg);
-            }
-        } catch (err) {
-            if (!navigator.onLine) {
-                showError('Sem conexão. Criação de link não disponível offline.');
-            } else {
-                showError('Erro de conexão. Tente novamente.');
-            }
-        } finally {
-            submitBtn.classList.remove('loading');
-            submitBtn.disabled = false;
-        }
+            var response = await fetch('/api/v1/payment-links/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrfToken(),'Idempotency-Key':crypto.randomUUID()}, body:JSON.stringify(payload)});
+            var data = await response.json();
+            if (response.ok) window.location.href = '/app/sucesso/?link_id=' + data.data.id;
+            else showError(typeof data.error?.message === 'string' ? data.error.message : (typeof data.detail === 'string' ? data.detail : 'Não foi possível criar o link. Tente novamente.'));
+        } catch (_) { showError(navigator.onLine ? 'Erro de conexão. Tente novamente.' : 'Sem conexão. Conecte-se para criar o link.'); }
+        finally { submitBtn.classList.remove('loading'); submitBtn.disabled = false; }
     });
-
-    function showError(msg) {
-        errorDiv.textContent = msg;
-        errorDiv.style.display = 'flex';
-    }
+    function showError(message) { errorDiv.textContent = message; errorDiv.style.display = 'flex'; }
 });
 </script>
 {% endblock %}

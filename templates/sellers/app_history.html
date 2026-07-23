@@ -1,133 +1,80 @@
 ﻿{% extends "sellers/app_base.html" %}
 {% load formatting %}
 {% block title %}Histórico — Vidalys Pay{% endblock %}
-{% block page_title %}Histórico de links{% endblock %}
-{% block page_description %}<p>Acompanhe cobranças e compartilhe links novamente.</p>{% endblock %}
+{% block page_title %}Histórico{% endblock %}
+{% block page_description %}<p>Encontre, acompanhe e compartilhe suas cobranças.</p>{% endblock %}
 
 {% block content %}
-<div class="filters" role="tablist" aria-label="Filtrar por status">
-    <button class="filter {% if not status_filter %}active{% endif %}" data-status="" role="tab" aria-selected="{% if not status_filter %}true{% else %}false{% endif %}">Todos</button>
-    <button class="filter {% if status_filter == 'ACTIVE' %}active{% endif %}" data-status="ACTIVE" role="tab" aria-selected="{% if status_filter == 'ACTIVE' %}true{% else %}false{% endif %}">Aguardando</button>
-    <button class="filter {% if status_filter == 'PAID' %}active{% endif %}" data-status="PAID" role="tab" aria-selected="{% if status_filter == 'PAID' %}true{% else %}false{% endif %}">Pagos</button>
-    <button class="filter {% if status_filter == 'CANCELED' %}active{% endif %}" data-status="CANCELED" role="tab" aria-selected="{% if status_filter == 'CANCELED' %}true{% else %}false{% endif %}">Cancelados</button>
-    <button class="filter {% if status_filter == 'EXPIRED' %}active{% endif %}" data-status="EXPIRED" role="tab" aria-selected="{% if status_filter == 'EXPIRED' %}true{% else %}false{% endif %}">Expirados</button>
+<section class="history-summary" aria-label="Resumo das cobranças">
+    <div class="history-summary__item history-summary__item--wide"><span>Total recebido</span><strong>{{ summary.paid_amount|default:0|format_brl }}</strong></div>
+    <div class="history-summary__item"><span>Aguardando</span><strong>{{ summary.active }}</strong></div>
+    <div class="history-summary__item"><span>Pagos</span><strong>{{ summary.paid }}</strong></div>
+</section>
+
+<form class="history-search" method="get" action="/app/historico/" role="search">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="search" name="q" value="{{ search_query }}" placeholder="Cliente, referência ou telefone" aria-label="Buscar links">
+    {% if search_query %}<a href="/app/historico/{% if status_filter %}?status={{ status_filter }}{% endif %}" aria-label="Limpar busca">×</a>{% endif %}
+</form>
+
+<div class="filters history-filters" aria-label="Filtrar por status">
+    <a class="filter {% if not status_filter %}active{% endif %}" href="/app/historico/{% if search_query %}?q={{ search_query|urlencode }}{% endif %}">Todos <b>{{ summary.total }}</b></a>
+    <a class="filter {% if status_filter == 'ACTIVE' %}active{% endif %}" href="?status=ACTIVE{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Aguardando <b>{{ status_counts.ACTIVE|default:0 }}</b></a>
+    <a class="filter {% if status_filter == 'PAID' %}active{% endif %}" href="?status=PAID{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Pagos <b>{{ status_counts.PAID|default:0 }}</b></a>
+    <a class="filter {% if status_filter == 'REFUNDED' %}active{% endif %}" href="?status=REFUNDED{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Reembolsados <b>{{ status_counts.REFUNDED|default:0 }}</b></a>
+    <a class="filter {% if status_filter == 'CANCELED' %}active{% endif %}" href="?status=CANCELED{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Cancelados <b>{{ status_counts.CANCELED|default:0 }}</b></a>
+    <a class="filter {% if status_filter == 'EXPIRED' %}active{% endif %}" href="?status=EXPIRED{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Expirados <b>{{ status_counts.EXPIRED|default:0 }}</b></a>
 </div>
 
 {% if links %}
-    <div id="linksList">
-    {% for link in links %}
-        <div class="link-card" data-status="{{ link.status }}">
-            <div class="link-card__header">
-                <div>
-                    <div class="link-card__reference">{{ link.reference }}</div>
-                    {% if link.customer_name %}
-                        <div class="link-card__customer">{{ link.customer_name }}</div>
-                    {% endif %}
-                </div>
-                {% if link.status == 'ACTIVE' %}
-                    <span class="badge badge--pending">Aguardando</span>
-                {% elif link.status == 'PAID' %}
-                    <span class="badge badge--paid">Pago</span>
-                {% elif link.status == 'CANCELED' %}
-                    <span class="badge badge--canceled">Cancelado</span>
-                {% elif link.status == 'EXPIRED' %}
-                    <span class="badge badge--expired">Expirado</span>
-                {% elif link.status == 'REFUNDED' %}
-                    <span class="badge badge--refunded">Reembolsado</span>
-                {% elif link.status == 'CREATING' %}
-                    <span class="badge badge--created">Criado</span>
-                {% else %}
-                    <span class="badge badge--created">{{ link.get_status_display }}</span>
-                {% endif %}
+<div id="linksList" class="history-list">
+{% for link in links %}
+    <article class="link-card history-card" data-status="{{ link.status }}">
+        <div class="history-card__top">
+            <div class="history-card__identity">
+                <span class="history-card__reference">{{ link.reference }}</span>
+                <strong>{{ link.customer_name|default:"Cliente não informado" }}</strong>
             </div>
-            <div class="link-card__amount">{{ link.amount_cents|format_brl }}</div>
-            <div class="link-card__meta">
-                <span>{{ link.installments }}x sem juros</span>
-                <span>{{ link.created_at|date:"d/m/Y H:mm" }}</span>
-            </div>
-            {% if link.payment_url %}
-            <div class="link-card__actions">
-                <button class="link-card__action" onclick="copyLink('{{ link.payment_url }}')" aria-label="Copiar link">
-                    Copiar
-                </button>
-                <button class="link-card__action" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')" aria-label="Compartilhar link">
-                    Compartilhar
-                </button>
-                <button class="link-card__action" onclick="resendLink('{{ link.id }}')" aria-label="Reenviar link">
-                    Reenviar
-                </button>
-            </div>
-            {% endif %}
+            {% if link.status == 'ACTIVE' %}<span class="badge badge--pending">Aguardando</span>
+            {% elif link.status == 'PAID' %}<span class="badge badge--paid">Pago</span>
+            {% elif link.status == 'CANCELED' %}<span class="badge badge--canceled">Cancelado</span>
+            {% elif link.status == 'EXPIRED' %}<span class="badge badge--expired">Expirado</span>
+            {% elif link.status == 'REFUNDED' %}<span class="badge badge--refunded">Reembolsado</span>
+            {% else %}<span class="badge badge--created">{{ link.get_status_display }}</span>{% endif %}
         </div>
-    {% endfor %}
-    </div>
+        <div class="history-card__value">{{ link.amount_cents|format_brl }}</div>
+        <div class="history-card__meta"><span>{{ link.installments }}x sem juros</span><span>{{ link.created_at|date:"d/m/Y" }} às {{ link.created_at|date:"H:mm" }}</span></div>
+        {% if link.payment_url %}
+        <div class="history-card__actions">
+            <button class="history-card__primary" type="button" onclick="shareLink('{{ link.payment_url|escapejs }}', '{{ link.reference|escapejs }}')">Compartilhar</button>
+            <details class="history-card__more">
+                <summary aria-label="Mais ações">•••</summary>
+                <div>
+                    <button type="button" onclick="copyLink('{{ link.payment_url|escapejs }}')">Copiar link</button>
+                    <button type="button" onclick="resendLink('{{ link.id }}')">Reenviar</button>
+                </div>
+            </details>
+        </div>
+        {% endif %}
+    </article>
+{% endfor %}
+</div>
 {% else %}
-    <div class="empty-state">
-        <div class="empty-state__icon">⌁</div>
-        <p class="empty-state__text">
-            {% if status_filter %}
-                Nenhum link encontrado com este filtro.
-            {% else %}
-                Você ainda não criou nenhum link.<br>Crie seu primeiro link e comece a receber pagamentos.
-            {% endif %}
-        </p>
-        <a href="/app/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-6);">Criar link</a>
-    </div>
+<div class="empty-state history-empty">
+    <div class="empty-state__icon">⌕</div>
+    <h2>{% if search_query %}Nenhum resultado encontrado{% elif status_filter %}Nenhum link neste status{% else %}Seu histórico começa aqui{% endif %}</h2>
+    <p class="empty-state__text">{% if search_query %}Tente buscar por outro nome, referência ou telefone.{% else %}Crie uma cobrança para acompanhar seu status nesta tela.{% endif %}</p>
+    <a href="/app/" class="btn-primary history-empty__action">Criar novo link</a>
+</div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Filter tabs
-    document.querySelectorAll('.filter').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const status = this.dataset.status;
-            window.location.href = status ? '/app/historico/?status=' + status : '/app/historico/';
-        });
-    });
-});
-
-async function copyLink(url) {
-    try {
-        await navigator.clipboard.writeText(url);
-        showToast('Link copiado!', 'success');
-    } catch {
-        showToast('Não foi possível copiar', 'error');
-    }
-}
-
-async function shareLink(url, reference) {
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: 'Link de pagamento - ' + reference,
-                text: 'Link de pagamento para pedido ' + reference,
-                url: url,
-            });
-        } catch {}
-    } else {
-        copyLink(url);
-    }
-}
-
-async function resendLink(linkId) {
-    try {
-        const response = await fetch('/api/v1/payment-links/' + linkId + '/resend/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
-                'Idempotency-Key': crypto.randomUUID(),
-            },
-        });
-        if (response.ok) {
-            showToast('Link reenviado!', 'success');
-        } else {
-            showToast('Erro ao reenviar', 'error');
-        }
-    } catch {
-        showToast('Erro de conexão', 'error');
-    }
-}
+async function copyLink(url) { try { await navigator.clipboard.writeText(url); showToast('Link copiado!', 'success'); } catch (_) { showToast('Não foi possível copiar', 'error'); } }
+async function shareLink(url, reference) { if (navigator.share) { try { await navigator.share({title:'Link de pagamento - ' + reference,text:'Link de pagamento para ' + reference,url:url}); } catch (_) {} } else copyLink(url); }
+async function resendLink(linkId) { try { var response = await fetch('/api/v1/payment-links/' + linkId + '/resend/', {method:'POST',headers:{'X-CSRFToken':getCsrfToken(),'Idempotency-Key':crypto.randomUUID()}}); showToast(response.ok ? 'Link reenviado!' : 'Erro ao reenviar', response.ok ? 'success' : 'error'); } catch (_) { showToast('Erro de conexão', 'error'); } }
+document.addEventListener('click', function(event) { document.querySelectorAll('.history-card__more[open]').forEach(function(menu) { if (!menu.contains(event.target)) menu.removeAttribute('open'); }); });
 </script>
 {% endblock %}

@@ -3,6 +3,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.staticfiles import finders
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -122,10 +123,28 @@ def app_history(request):
     from apps.payment_links.models import PaymentLink
 
     status_filter = request.GET.get("status", "")
-    links = PaymentLink.objects.filter(seller=seller)
+    search_query = request.GET.get("q", "").strip()[:120]
+    seller_links = PaymentLink.objects.filter(seller=seller)
+
+    summary = seller_links.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(status="ACTIVE")),
+        paid=Count("id", filter=Q(status="PAID")),
+        paid_amount=Sum("amount_cents", filter=Q(status="PAID")),
+    )
+    status_counts = dict(
+        seller_links.values_list("status").annotate(total=Count("id"))
+    )
+    links = seller_links
 
     if status_filter:
         links = links.filter(status=status_filter)
+    if search_query:
+        links = links.filter(
+            Q(reference__icontains=search_query)
+            | Q(customer_name__icontains=search_query)
+            | Q(customer_phone__icontains=search_query)
+        )
 
     links = links.select_related()[:50]
 
@@ -133,6 +152,9 @@ def app_history(request):
         "seller": seller,
         "links": links,
         "status_filter": status_filter,
+        "search_query": search_query,
+        "summary": summary,
+        "status_counts": status_counts,
         "active_tab": "history",
     })
 
