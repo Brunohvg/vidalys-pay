@@ -82,6 +82,23 @@ class PagarmeClient:
         response = httpx.get(url, headers=headers, timeout=self._timeout)
         return self._handle_response(response)
 
+    def _delete(
+        self,
+        path: str,
+        json: dict,
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        headers = self._headers()
+        extra_headers = extra_headers or {}
+        if any(key.lower() == "authorization" for key in extra_headers):
+            raise ValueError("O header Authorization não pode ser sobrescrito.")
+        headers.update(extra_headers)
+        _log_request_diagnostics("DELETE", url, headers)
+        response = httpx.delete(url, json=json, headers=headers, timeout=self._timeout)
+        return self._handle_response(response)
+
     def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
         if response.status_code < 400:
             return response.json()
@@ -242,6 +259,19 @@ class PagarmeClient:
         return self._post(
             "orders",
             payload,
+            extra_headers={"Idempotency-Key": idempotency_key},
+        )
+
+    def cancel_boleto_charge(
+        self,
+        *,
+        charge_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Cancel one unpaid boleto charge; paid boleto refunds are out of scope."""
+        return self._delete(
+            f"charges/{charge_id}",
+            {},
             extra_headers={"Idempotency-Key": idempotency_key},
         )
 

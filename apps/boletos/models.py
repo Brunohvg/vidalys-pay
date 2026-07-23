@@ -56,6 +56,7 @@ class BoletoStatus(models.TextChoices):
     CREATION_UNKNOWN = "CREATION_UNKNOWN", "Confirmação pendente"
     CREATION_ERROR = "CREATION_ERROR", "Erro na emissão"
     PENDING = "PENDING", "Aguardando pagamento"
+    CANCELING = "CANCELING", "Cancelamento pendente"
     PAID = "PAID", "Pago"
     FAILED = "FAILED", "Falhou"
     EXPIRED = "EXPIRED", "Vencido"
@@ -76,6 +77,13 @@ class Boleto(UUIDModel, TimeStampedModel):
         Company,
         on_delete=models.PROTECT,
         related_name="boletos",
+    )
+    reissued_from = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reissues",
     )
     created_by_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -119,6 +127,9 @@ class Boleto(UUIDModel, TimeStampedModel):
     expired_at = models.DateTimeField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)
     refunded_at = models.DateTimeField(null=True, blank=True)
+    cancellation_idempotency_key = models.CharField(max_length=100, blank=True, default="")
+    cancellation_response = models.JSONField(default=dict, blank=True)
+    cancellation_requested_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Boleto"

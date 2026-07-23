@@ -36,6 +36,9 @@ Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASI
 | Listar/detalhar link | Sim | Não | `payment_links:read` + `seller_id` |
 | Reenviar WhatsApp | Sim | Não | `notifications:write` + `seller_id` |
 | Consultar CNPJ | Sim | Superusuário | Não |
+| Criar/cancelar/segunda via | Sim | Não | `boletos:write` + `seller_id` |
+| Listar/detalhar/situação | Sim | Não | `boletos:read` + `seller_id` |
+| Reenviar boleto | Sim | Não | `notifications:write` + `seller_id` |
 | CEP e cálculo de frete | Sim | Não | Não |
 | Webhook Pagar.me | Não | Não | HTTP Basic próprio |
 
@@ -265,6 +268,64 @@ todos os campos do payload são idênticos; qualquer diferença retorna `409`.
 Aceita CNPJ com ou sem máscara. Exige sessão ativa de vendedor ou sessão Django
 de superusuário. Retorna `400` para CNPJ inválido, `404` quando não encontrado,
 `503` quando o provedor está indisponível e `504` em timeout. Limite: 20/minuto.
+
+### Emitir boleto
+
+**POST** `/api/v1/boletos/`
+
+Exige `Idempotency-Key`, sessão de vendedor ou API Key com `boletos:write`.
+Com API Key, envie também `seller_id`. O body contém dados cadastrais e endereço
+da empresa, `amount_cents`, `due_date`, `description` e referências internas.
+Retorna `201`; resultado incerto no Pagar.me retorna `202`.
+
+A mesma chave com payload idêntico reutiliza o boleto. A mesma chave com
+qualquer dado diferente retorna `409`.
+
+### Listar boletos
+
+**GET** `/api/v1/boletos/`
+
+Filtros: `status`, `due_from`, `due_to`, `cursor` e `limit` (1–100). API Key
+também exige `seller_id`.
+
+### Detalhar e consultar situação
+
+- **GET** `/api/v1/boletos/{id}/`: dados comerciais, linha digitável, PDF,
+  relação de segunda via e notificações sanitizadas.
+- **GET** `/api/v1/boletos/{id}/status/`: estado local, estado do provedor e
+  timestamps relevantes.
+
+Os endpoints sempre filtram pelo vendedor autenticado. Um UUID pertencente a
+outro vendedor responde `404`.
+
+### Cancelar boleto
+
+**POST** `/api/v1/boletos/{id}/cancel/`
+
+Exige `Idempotency-Key` e `boletos:write`. Apenas boletos não pagos em
+`PENDING` ou `FAILED` são enviados ao Pagar.me. Boleto pago não é estornado
+implicitamente. Confirmação imediata retorna `200`; resultado incerto retorna
+`202` e permanece `CANCELING` até webhook.
+
+### Reenviar boleto
+
+**POST** `/api/v1/boletos/{id}/resend/`
+
+Exige `Idempotency-Key` e `notifications:write`. Reutilizar a mesma chave não
+duplica WhatsApp; nova tentativa intencional precisa de uma chave nova.
+
+### Emitir segunda via
+
+**POST** `/api/v1/boletos/{id}/second-copy/`
+
+```json
+{"due_date": "2026-08-20"}
+```
+
+Exige `Idempotency-Key` e `boletos:write`. O original precisa estar
+`CANCELED`, `EXPIRED` ou `FAILED`. A nova cobrança copia os dados comerciais,
+recebe novos identificadores, linha e PDF, e guarda `reissued_from_id`. O
+original permanece inalterado e expõe a nova cobrança em `reissue_ids`.
 
 ### Consultar CEP
 

@@ -60,8 +60,17 @@ jurídica e alteração revisada no cliente Pagar.me.
 | Vendedor | `/app/boletos/` | Listagem restrita ao vendedor |
 | Vendedor | `/app/boletos/criar/` | Emissão para si próprio |
 | Vendedor | `/app/boletos/<uuid>/` | Detalhes sem payload técnico |
+| API | `/api/v1/boletos/` | Emitir e listar com sessão/API Key |
+| API | `/api/v1/boletos/<uuid>/` | Detalhar e consultar situação |
+| API | `/api/v1/boletos/<uuid>/cancel/` | Cancelar boleto não pago |
+| API | `/api/v1/boletos/<uuid>/resend/` | Reenviar com idempotência |
+| API | `/api/v1/boletos/<uuid>/second-copy/` | Nova cobrança ligada à original |
 | Interna | `/api/v1/boletos/cnpj/<cnpj>/` | Consulta autenticada de CNPJ |
 | Pública autenticada | `/api/v1/webhooks/pagarme/` | Endpoint Pagar.me consolidado |
+
+Cancelamento usa a charge correlacionada e nunca converte boleto pago em
+estorno implícito. Segunda via cria um novo `Boleto` com relação
+`reissued_from` e preserva integralmente o histórico anterior.
 
 ## Webhook e reconciliação
 

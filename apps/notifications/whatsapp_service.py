@@ -366,7 +366,11 @@ def _queue_message(
     return message
 
 
-def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
+def queue_boleto_created(
+    *,
+    boleto,
+    deduplication_suffix: str = "",
+) -> list[WhatsAppDeliveryResult]:
     """Queue the creation notice for seller and, when available, customer."""
     deliveries = []
     recipients = [
@@ -408,6 +412,7 @@ def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
             aggregate_id=boleto.id,
             recipient_phone=normalized_phone,
             recipient_type=recipient_type,
+            deduplication_suffix=deduplication_suffix,
             deduplicate_forever=True,
         )
         deliveries.append(

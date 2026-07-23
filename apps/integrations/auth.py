@@ -14,6 +14,8 @@ SCOPES = [
     "payment_links:read",
     "payment_links:write",
     "notifications:write",
+    "boletos:read",
+    "boletos:write",
 ]
 
 

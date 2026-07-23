@@ -66,6 +66,11 @@ ALLOWED_TRANSITIONS = {
         BoletoStatus.CANCELED,
         BoletoStatus.PARTIALLY_CANCELED,
     },
+    BoletoStatus.CANCELING: {
+        BoletoStatus.CANCELED,
+        BoletoStatus.PAID,
+        BoletoStatus.FAILED,
+    },
     BoletoStatus.FAILED: {BoletoStatus.PENDING, BoletoStatus.PAID},
     BoletoStatus.EXPIRED: {BoletoStatus.PAID},
     BoletoStatus.PAID: {BoletoStatus.PARTIALLY_CANCELED, BoletoStatus.REFUNDED},

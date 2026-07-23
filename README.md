@@ -188,6 +188,13 @@ vidalys-pay/
 | POST | `/api/v1/payment-links/{id}/resend/` | Reenviar link |
 | POST | `/api/v1/webhooks/pagarme/` | Webhook Pagar.me |
 | GET | `/api/v1/boletos/cnpj/{cnpj}/` | Consulta autenticada de CNPJ |
+| POST | `/api/v1/boletos/` | Emitir boleto |
+| GET | `/api/v1/boletos/` | Listar boletos |
+| GET | `/api/v1/boletos/{id}/` | Detalhar boleto |
+| GET | `/api/v1/boletos/{id}/status/` | Consultar situação |
+| POST | `/api/v1/boletos/{id}/cancel/` | Cancelar boleto não pago |
+| POST | `/api/v1/boletos/{id}/resend/` | Reenviar boleto |
+| POST | `/api/v1/boletos/{id}/second-copy/` | Emitir segunda via vinculada |
 | POST | `/api/v1/freight/cep/` | Consulta autenticada de CEP |
 | POST | `/api/v1/freight/calculate/` | Cálculo autenticado de frete |
 | GET | `/health/` | Health check |

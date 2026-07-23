@@ -43,6 +43,62 @@
         "responses": {"202": {"description": "Entrega enfileirada ou já deduplicada."}, "400": {"$ref": "#/components/responses/ValidationError"}, "404": {"description": "Não encontrado."}, "422": {"description": "Link sem URL."}}
       }
     },
+    "/api/v1/boletos/": {
+      "get": {
+        "summary": "Lista boletos do vendedor",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/SellerId"}, {"name": "status", "in": "query", "schema": {"$ref": "#/components/schemas/BoletoStatus"}}, {"name": "cursor", "in": "query", "schema": {"type": "string", "format": "date-time"}}, {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}}, {"name": "due_from", "in": "query", "schema": {"type": "string", "format": "date"}}, {"name": "due_to", "in": "query", "schema": {"type": "string", "format": "date"}}],
+        "responses": {"200": {"description": "Lista paginada."}, "400": {"$ref": "#/components/responses/ValidationError"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "403": {"$ref": "#/components/responses/Forbidden"}}
+      },
+      "post": {
+        "summary": "Emite boleto",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BoletoCreate"}}}},
+        "responses": {"201": {"description": "Boleto emitido."}, "202": {"description": "Emissão aguardando confirmação."}, "400": {"$ref": "#/components/responses/ValidationError"}, "409": {"description": "Conflito de idempotência."}, "422": {"description": "Regra de negócio ou recusa do provedor."}}
+      }
+    },
+    "/api/v1/boletos/{boleto_id}/": {
+      "get": {
+        "summary": "Detalha boleto",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/BoletoId"}, {"$ref": "#/components/parameters/SellerId"}],
+        "responses": {"200": {"description": "Detalhe sanitizado."}, "404": {"description": "Não encontrado no escopo do vendedor."}}
+      }
+    },
+    "/api/v1/boletos/{boleto_id}/status/": {
+      "get": {
+        "summary": "Consulta situação do boleto",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/BoletoId"}, {"$ref": "#/components/parameters/SellerId"}],
+        "responses": {"200": {"description": "Estado e timestamps."}, "404": {"description": "Não encontrado."}}
+      }
+    },
+    "/api/v1/boletos/{boleto_id}/cancel/": {
+      "post": {
+        "summary": "Cancela boleto não pago",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/BoletoId"}, {"$ref": "#/components/parameters/SellerId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "responses": {"200": {"description": "Cancelamento confirmado."}, "202": {"description": "Aguardando webhook."}, "409": {"description": "Outro cancelamento em processamento."}, "422": {"description": "Estado não cancelável."}}
+      }
+    },
+    "/api/v1/boletos/{boleto_id}/resend/": {
+      "post": {
+        "summary": "Reenvia boleto por WhatsApp",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/BoletoId"}, {"$ref": "#/components/parameters/SellerId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "responses": {"202": {"description": "Entregas enfileiradas ou deduplicadas."}, "422": {"description": "Boleto sem linha/PDF."}}
+      }
+    },
+    "/api/v1/boletos/{boleto_id}/second-copy/": {
+      "post": {
+        "summary": "Emite segunda via vinculada",
+        "security": [{"SellerSession": []}, {"ApiKey": []}],
+        "parameters": [{"$ref": "#/components/parameters/BoletoId"}, {"$ref": "#/components/parameters/SellerId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["due_date"], "properties": {"seller_id": {"type": "string", "format": "uuid"}, "due_date": {"type": "string", "format": "date"}}}}}},
+        "responses": {"201": {"description": "Segunda via emitida."}, "202": {"description": "Emissão aguardando confirmação."}, "409": {"description": "Conflito de idempotência."}, "422": {"description": "Original ainda ativo ou regra de negócio."}}
+      }
+    },
     "/api/v1/boletos/cnpj/{cnpj}/": {
       "get": {
         "summary": "Consulta dados cadastrais de CNPJ",
@@ -88,6 +144,7 @@
     "parameters": {
       "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "maxLength": 100}},
       "LinkId": {"name": "link_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "BoletoId": {"name": "boleto_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
       "SellerId": {"name": "seller_id", "in": "query", "schema": {"type": "string", "format": "uuid"}, "description": "Obrigatório com API Key."}
     },
     "responses": {
@@ -109,6 +166,32 @@
           "customer_phone": {"type": "string", "maxLength": 20, "description": "E.164 ou telefone brasileiro com DDD; normalizado para E.164."},
           "description": {"type": "string", "maxLength": 255},
           "expires_in_minutes": {"type": ["integer", "null"], "minimum": 10, "maximum": 43200}
+        }
+      },
+      "BoletoStatus": {"type": "string", "enum": ["CREATING", "CREATION_UNKNOWN", "CREATION_ERROR", "PENDING", "CANCELING", "PAID", "FAILED", "EXPIRED", "CANCELED", "PARTIALLY_CANCELED", "REFUNDED"]},
+      "BoletoCreate": {
+        "type": "object",
+        "required": ["cnpj", "legal_name", "email", "phone", "zip_code", "street", "number", "district", "city", "state", "amount_cents", "due_date", "description"],
+        "properties": {
+          "seller_id": {"type": "string", "format": "uuid", "description": "Obrigatório com API Key."},
+          "cnpj": {"type": "string", "maxLength": 20},
+          "legal_name": {"type": "string", "maxLength": 200},
+          "trade_name": {"type": "string", "maxLength": 200},
+          "email": {"type": "string", "format": "email"},
+          "phone": {"type": "string", "maxLength": 20},
+          "whatsapp_phone": {"type": "string", "maxLength": 20},
+          "zip_code": {"type": "string", "maxLength": 10},
+          "street": {"type": "string", "maxLength": 200},
+          "number": {"type": "string", "maxLength": 20},
+          "complement": {"type": "string", "maxLength": 100},
+          "district": {"type": "string", "maxLength": 100},
+          "city": {"type": "string", "maxLength": 100},
+          "state": {"type": "string", "minLength": 2, "maxLength": 2},
+          "amount_cents": {"type": "integer", "minimum": 1},
+          "due_date": {"type": "string", "format": "date"},
+          "description": {"type": "string", "maxLength": 255},
+          "internal_reference": {"type": "string", "maxLength": 80},
+          "internal_notes": {"type": "string", "maxLength": 2000}
         }
       },
       "FreightCalculate": {

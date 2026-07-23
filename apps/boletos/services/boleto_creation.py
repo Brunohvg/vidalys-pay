@@ -58,6 +58,7 @@ def create_boleto(
     data: BoletoCreationData,
     idempotency_key: str,
     client: PagarmeClient | None = None,
+    reissued_from: Boleto | None = None,
 ) -> CreateBoletoResult:
     """Create a local attempt first, then one Pagar.me order."""
     validation_error = _validate_creation(seller, actor_user, actor_seller, data, idempotency_key)
@@ -66,6 +67,10 @@ def create_boleto(
 
     snapshot = _company_snapshot(data)
     request_summary = _request_summary(data, snapshot)
+    if reissued_from:
+        if reissued_from.seller_id != seller.id:
+            return CreateBoletoResult(None, False, "Boleto original pertence a outro vendedor.")
+        request_summary["reissued_from_id"] = str(reissued_from.id)
     payload_hash = _payload_hash(request_summary)
 
     existing = Boleto.objects.filter(
@@ -81,6 +86,7 @@ def create_boleto(
             boleto = Boleto.objects.create(
                 seller=seller,
                 company=company,
+                reissued_from=reissued_from,
                 created_by_user=actor_user,
                 created_by_seller=actor_seller,
                 amount_cents=data.amount_cents,
