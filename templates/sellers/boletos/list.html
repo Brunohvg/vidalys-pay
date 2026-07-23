@@ -5,5 +5,5 @@
 {% block page_title %}Boletos{% endblock %}
 {% block page_description %}<p>Acompanhe emissões, vencimentos e pagamentos.</p>{% endblock %}
 {% block page_action %}<a class="boleto-header-action" href="{% url 'boletos:seller_create' %}">Novo</a>{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}?v=mobile-2">{% endblock %}
 {% block content %}{% include "boletos/_list_content.html" %}{% endblock %}

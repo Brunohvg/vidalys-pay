@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.notifications.models import WhatsAppMessage
-from apps.sellers.models import Seller
+from apps.sellers.models import Selle
 from apps.webhooks.models import WebhookEvent
 
 
@@ -147,6 +147,10 @@ def test_seller_list_is_scoped_without_metrics(client, sellers, companies):
     assert "metrics" not in response.context
     assert b"boleto-metrics" not in response.content
     assert b"<dt>Vendedor</dt>" not in response.content
+    assert b'name="created_from"' not in response.content
+    assert b'name="created_to"' not in response.content
+    assert b'name="due_date"' not in response.content
+    assert response.content.count(b'class="nav__icon"') == 5
 
 
 @pytest.mark.django_db

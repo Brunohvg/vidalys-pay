@@ -682,3 +682,175 @@
         grid-template-columns: 1fr;
     }
 }
+
+.boleto-cnpj-lookup {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.boleto-cnpj-lookup input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.boleto-cnpj-lookup .boleto-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+    .seller-app nav.nav {
+        min-height: 66px;
+        padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    }
+
+    .seller-app nav.nav .nav__inner {
+        display: grid !important;
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        gap: 0;
+    }
+
+    .seller-app nav.nav a {
+        width: 100%;
+        min-width: 0;
+        min-height: 52px;
+        padding: 3px 0 1px;
+        overflow: hidden;
+        font-size: .58rem;
+        white-space: nowrap;
+    }
+
+    .seller-app nav.nav .nav__icon {
+        width: 30px;
+        height: 25px;
+    }
+
+    .seller-app .boleto-card,
+    .seller-app .boleto-result,
+    .seller-app .boleto-history {
+        padding: 14px;
+        border-radius: 16px;
+    }
+
+    .seller-app .boleto-card > h2 {
+        margin-top: 22px;
+        font-size: 1.08rem;
+    }
+
+    .seller-app .boleto-steps {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+        overflow: visible;
+    }
+
+    .seller-app .boleto-steps span {
+        min-width: 0;
+        padding: 9px 4px;
+        overflow: hidden;
+        font-size: .59rem;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .seller-app .boleto-grid {
+        gap: 13px;
+    }
+
+    .seller-app .boleto-field {
+        gap: 5px;
+    }
+
+    .seller-app .boleto-field input,
+    .seller-app .boleto-field select,
+    .seller-app .boleto-field textarea {
+        min-height: 46px;
+        border-radius: 12px;
+        font-size: 1rem;
+    }
+
+    .seller-app .boleto-cnpj-lookup {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 7px;
+    }
+
+    .seller-app .boleto-cnpj-lookup .boleto-btn {
+        min-height: 44px;
+    }
+
+    .seller-app #cnpjStatus {
+        min-height: 16px;
+        color: var(--color-gray-500);
+        font-size: .68rem;
+        line-height: 1.35;
+    }
+
+    .seller-app .boleto-filters {
+        padding: 12px;
+        border-radius: 15px;
+    }
+
+    .seller-app .boleto-search {
+        min-height: 44px;
+    }
+
+    .seller-app .boleto-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .seller-app .boleto-filter-actions {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        margin-top: 11px;
+    }
+
+    .seller-app .boleto-filter-actions button,
+    .seller-app .boleto-filter-actions a {
+        min-height: 42px;
+        padding-inline: 14px;
+    }
+
+    .seller-app .boleto-list-heading {
+        margin: 22px 0 10px;
+    }
+
+    .seller-app .boleto-list-heading h2 {
+        font-size: 1.2rem;
+    }
+
+    .seller-app .boleto-list-card {
+        padding: 14px;
+        border-radius: 16px;
+    }
+
+    .seller-app .boleto-list-card__top {
+        gap: 8px;
+    }
+
+    .seller-app .boleto-list-card__identity strong {
+        font-size: .78rem;
+    }
+
+    .seller-app .boleto-status {
+        max-width: 48%;
+        overflow: hidden;
+        font-size: .58rem;
+        text-overflow: ellipsis;
+    }
+
+    .seller-app .boleto-list-card__amount {
+        margin: 17px 0 13px;
+        font-size: 1.65rem;
+    }
+
+    .seller-app .boleto-list-card__action {
+        min-height: 38px;
+        margin-top: 13px;
+        padding-top: 10px;
+        font-size: .78rem;
+    }
+}

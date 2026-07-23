@@ -38,7 +38,7 @@
         {% if form.non_field_errors %}<div class="boleto-alert">{{ form.non_field_errors }}</div>{% endif %}
         <h2>Empresa</h2>
         <div class="boleto-grid">
-            <div class="boleto-field full"><label for="id_cnpj">CNPJ</label><div style="display:flex;gap:8px"><input id="id_cnpj" name="cnpj" value="{{ form.cnpj.value|default:'' }}" required style="flex:1"><button class="boleto-btn secondary" type="button" id="lookupCnpj">Buscar CNPJ</button></div><span id="cnpjStatus" aria-live="polite"></span><span class="boleto-errors">{{ form.cnpj.errors }}</span></div>
+            <div class="boleto-field full"><label for="id_cnpj">CNPJ</label><div class="boleto-cnpj-lookup"><input id="id_cnpj" name="cnpj" value="{{ form.cnpj.value|default:'' }}" inputmode="numeric" required><button class="boleto-btn secondary" type="button" id="lookupCnpj">Buscar CNPJ</button></div><span id="cnpjStatus" aria-live="polite"></span><span class="boleto-errors">{{ form.cnpj.errors }}</span></div>
             <div class="boleto-field"><label for="id_legal_name">Razão social</label><input id="id_legal_name" name="legal_name" value="{{ form.legal_name.value|default:'' }}" required><span class="boleto-errors">{{ form.legal_name.errors }}</span></div>
             <div class="boleto-field"><label for="id_trade_name">Nome fantasia</label><input id="id_trade_name" name="trade_name" value="{{ form.trade_name.value|default:'' }}"><span class="boleto-errors">{{ form.trade_name.errors }}</span></div>
             <div class="boleto-field"><label for="id_email">E-mail</label><input type="email" id="id_email" name="email" value="{{ form.email.value|default:'' }}" required><span class="boleto-errors">{{ form.email.errors }}</span></div>
@@ -79,7 +79,7 @@
       var body=await response.json();
       if(!response.ok)throw new Error(body.error?.message||'Não foi possível consultar o CNPJ.');
       var data=body.data,map={legal_name:'legal_name',trade_name:'trade_name',email:'email',phone:'phone',zip_code:'zip_code',street:'street',number:'number',complement:'complement',district:'district',city:'city',state:'state'};
-      Object.keys(map).forEach(function(key){var input=document.getElementById('id_'+map[key]);if(input&&!input.value)input.value=data[key]||''});
+      Object.keys(map).forEach(function(key){var input=document.getElementById('id_'+map[key]);if(input)input.value=data[key]||''});
       status.textContent='Dados encontrados. Revise e complete os campos.';
     }catch(error){if(error.name!=='AbortError')status.textContent=error.message}
     finally{lookup.disabled=false}
