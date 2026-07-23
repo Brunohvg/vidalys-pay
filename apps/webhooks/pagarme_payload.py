@@ -55,12 +55,12 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
         payment_link_id=_extract_payment_link_id(data),
         checkout_id=_extract_checkout_id(data),
         order_id=_extract_order_id(data, resource_type),
-        order_code=data.get("code", ""),
+        order_code=_optional_text(data.get("code")),
         charge_id=_extract_charge_id(data, resource_type),
         transaction_id=_extract_transaction_id(data, resource_type),
         internal_payment_link_id=_extract_internal_id(data),
         internal_boleto_id=_extract_metadata_value(data, "internal_boleto_id"),
-        status=data.get("status", ""),
+        status=_optional_text(data.get("status")),
         amount_cents=_extract_amount(data),
         installments=_extract_installments(data),
         payment_method=_extract_payment_method(data),
@@ -69,72 +69,71 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
 
 
 def _extract_payment_link_id(data: dict) -> str | None:
-    pid = data.get("payment_link", {}).get("id", "")
-    return pid or None
+    return _optional_text(_as_dict(data.get("payment_link")).get("id"))
 
 
 def _extract_checkout_id(data: dict) -> str | None:
-    cid = data.get("checkout", {}).get("id", "")
-    return cid or None
+    return _optional_text(_as_dict(data.get("checkout")).get("id"))
 
 
 def _extract_order_id(data: dict, resource_type: str) -> str | None:
-    oid = data.get("order", {}).get("id", "")
+    oid = _optional_text(_as_dict(data.get("order")).get("id"))
     if oid:
         return oid
     if resource_type == "order":
-        return data.get("id", "") or None
+        return _optional_text(data.get("id"))
     return None
 
 
 def _extract_charge_id(data: dict, resource_type: str) -> str | None:
     charges = data.get("charges", [])
     if isinstance(charges, list) and charges:
-        return charges[0].get("id") or None
+        return _optional_text(_as_dict(charges[0]).get("id"))
     if resource_type == "charge":
-        return data.get("id") or None
+        return _optional_text(data.get("id"))
     return None
 
 
 def _extract_transaction_id(data: dict, resource_type: str) -> str | None:
-    charges = data.get("charges", [])
-    if isinstance(charges, list) and charges:
-        last_txn = charges[0].get("last_transaction", {})
+    charge = _get_first_charge(data)
+    if charge:
+        last_txn = charge.get("last_transaction", {})
         if isinstance(last_txn, dict):
-            return last_txn.get("id") or None
+            return _optional_text(last_txn.get("id"))
     if resource_type == "charge":
         last_txn = data.get("last_transaction", {})
         if isinstance(last_txn, dict):
-            return last_txn.get("id") or None
+            return _optional_text(last_txn.get("id"))
     return None
 
 
 def _extract_internal_id(data: dict) -> str | None:
     metadata = data.get("metadata", {})
     if isinstance(metadata, dict):
-        iid = metadata.get("internal_payment_link_id", "")
-        return iid or None
+        iid = _optional_text(metadata.get("internal_payment_link_id"))
+        if iid:
+            return iid
 
-    order_metadata = data.get("order", {}).get("metadata", {})
+    order_metadata = _as_dict(data.get("order")).get("metadata", {})
     if isinstance(order_metadata, dict):
-        iid = order_metadata.get("internal_payment_link_id", "")
-        return iid or None
+        iid = _optional_text(order_metadata.get("internal_payment_link_id"))
+        if iid:
+            return iid
 
     charge = _get_first_charge(data)
     if charge:
         charge_meta = charge.get("metadata", {})
         if isinstance(charge_meta, dict):
-            iid = charge_meta.get("internal_payment_link_id", "")
-            return iid or None
+            iid = _optional_text(charge_meta.get("internal_payment_link_id"))
+            if iid:
+                return iid
 
     return None
 
 
 def _extract_metadata_value(data: dict, key: str) -> str | None:
     """Read metadata consistently from order, charge or nested order payloads."""
-    nested_order = data.get("order", {})
-    if not isinstance(nested_order, dict):
-        nested_order = {}
+    nested_order = _as_dict(data.get("order"))
     candidates = [
         data.get("metadata", {}),
         nested_order.get("metadata", {}),
@@ -146,16 +145,30 @@ def _extract_metadata_value(data: dict, key: str) -> str | None:
     for metadata in candidates:
         if isinstance(metadata, dict):
             value = metadata.get(key)
-            if value:
-                return str(value)
+            normalized = _optional_text(value)
+            if normalized:
+                return normalized
     return None
 
 
 def _get_first_charge(data: dict) -> dict | None:
     charges = data.get("charges", [])
-    if isinstance(charges, list) and charges:
+    if isinstance(charges, list) and charges and isinstance(charges[0], dict):
         return charges[0]
     return None
+
+
+def _as_dict(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _optional_text(value: object, max_length: int = 120) -> str | None:
+    if not isinstance(value, (str, int)):
+        return None
+    text = str(value).strip()
+    if not text or len(text) > max_length:
+        return None
+    return text
 
 
 def _extract_amount(data: dict) -> int | None:

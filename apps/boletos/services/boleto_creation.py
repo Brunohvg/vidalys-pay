@@ -3,8 +3,10 @@ import hashlib
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from datetime import date
+from urllib.parse import urlsplit
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -104,6 +106,7 @@ def create_boleto(
         raise
 
     provider_client = client or PagarmeClient()
+    provider_started_at = time.monotonic()
     try:
         response = provider_client.create_boleto_order(
             code=f"BOL-{boleto.id}",
@@ -121,6 +124,13 @@ def create_boleto(
             instructions="Não receber após o vencimento.",
         )
     except PagarmeError as exc:
+        logger.warning(
+            "boleto_creation_provider_error=true boleto=%s seller=%s status=%s duration_ms=%d",
+            boleto.id,
+            seller.id,
+            exc.status_code,
+            (time.monotonic() - provider_started_at) * 1000,
+        )
         if exc.status_code >= 500:
             return _mark_unknown(boleto)
         boleto.status = BoletoStatus.CREATION_ERROR
@@ -135,12 +145,22 @@ def create_boleto(
             "Não foi possível emitir o boleto. Revise os dados e tente novamente.",
         )
     except Exception:
-        logger.exception("Resultado incerto ao emitir boleto id=%s", boleto.id)
+        logger.exception(
+            "boleto_creation_unknown=true boleto=%s seller=%s duration_ms=%d",
+            boleto.id,
+            seller.id,
+            (time.monotonic() - provider_started_at) * 1000,
+        )
         return _mark_unknown(boleto)
 
     parsed = _parse_provider_response(response)
     if not parsed["order_id"] or not parsed["charge_id"]:
-        logger.warning("Resposta incompleta na emissão do boleto id=%s", boleto.id)
+        logger.warning(
+            "boleto_creation_incomplete=true boleto=%s seller=%s duration_ms=%d",
+            boleto.id,
+            seller.id,
+            (time.monotonic() - provider_started_at) * 1000,
+        )
         return _mark_unknown(boleto, parsed)
 
     boleto.provider_order_id = parsed["order_id"]
@@ -169,6 +189,14 @@ def create_boleto(
     transaction.on_commit(
         lambda boleto_id=boleto.id: _queue_created_notification(boleto_id),
         robust=True,
+    )
+    logger.info(
+        "boleto_creation_success=true boleto=%s seller=%s order=%s charge=%s duration_ms=%d",
+        boleto.id,
+        seller.id,
+        boleto.provider_order_id,
+        boleto.provider_charge_id,
+        (time.monotonic() - provider_started_at) * 1000,
     )
     return CreateBoletoResult(boleto, True)
 
@@ -314,18 +342,64 @@ def _pagarme_customer(snapshot: dict) -> dict:
 
 
 def _parse_provider_response(response: dict) -> dict:
+    if not isinstance(response, dict):
+        return _empty_provider_response()
     charges = response.get("charges") or []
     charge = charges[0] if isinstance(charges, list) and charges else {}
+    if not isinstance(charge, dict):
+        charge = {}
     transaction_data = charge.get("last_transaction") or {}
+    if not isinstance(transaction_data, dict):
+        transaction_data = {}
     return {
-        "order_id": response.get("id") or "",
-        "charge_id": charge.get("id") or "",
-        "transaction_id": transaction_data.get("id") or "",
-        "provider_status": charge.get("status") or response.get("status") or "",
-        "digitable_line": transaction_data.get("line") or "",
-        "barcode": transaction_data.get("barcode") or "",
-        "pdf_url": transaction_data.get("pdf") or transaction_data.get("url") or "",
+        "order_id": _bounded_text(response.get("id"), 100),
+        "charge_id": _bounded_text(charge.get("id"), 100),
+        "transaction_id": _bounded_text(transaction_data.get("id"), 100),
+        "provider_status": _bounded_text(
+            charge.get("status") or response.get("status"),
+            80,
+        ),
+        "digitable_line": _bounded_digits(transaction_data.get("line"), 120),
+        "barcode": _bounded_digits(transaction_data.get("barcode"), 120),
+        "pdf_url": _safe_provider_url(
+            transaction_data.get("pdf") or transaction_data.get("url")
+        ),
     }
+
+
+def _empty_provider_response() -> dict:
+    return {
+        "order_id": "",
+        "charge_id": "",
+        "transaction_id": "",
+        "provider_status": "",
+        "digitable_line": "",
+        "barcode": "",
+        "pdf_url": "",
+    }
+
+
+def _bounded_text(value, max_length: int) -> str:
+    if not isinstance(value, (str, int)):
+        return ""
+    text = str(value).strip()
+    return text if len(text) <= max_length else ""
+
+
+def _bounded_digits(value, max_length: int) -> str:
+    if not isinstance(value, (str, int)):
+        return ""
+    digits = re.sub(r"\D", "", str(value))
+    return digits if len(digits) <= max_length else ""
+
+
+def _safe_provider_url(value) -> str:
+    if not isinstance(value, str) or len(value) > 500:
+        return ""
+    parsed = urlsplit(value.strip())
+    if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+        return ""
+    return parsed.geturl()
 
 
 def _mark_unknown(boleto: Boleto, summary: dict | None = None) -> CreateBoletoResult:

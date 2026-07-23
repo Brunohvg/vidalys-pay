@@ -48,6 +48,16 @@ def check_production_configuration(app_configs, **kwargs):
     if parsed_url.scheme != "https" or not parsed_url.netloc:
         messages.append(Error("APP_BASE_URL deve ser uma URL HTTPS válida em produção.", id="core.E006"))
 
+    cnpj_url = getattr(settings, "CNPJ_LOOKUP_BASE_URL", "")
+    parsed_cnpj_url = urlparse(cnpj_url)
+    if parsed_cnpj_url.scheme != "https" or not parsed_cnpj_url.netloc:
+        messages.append(
+            Error(
+                "CNPJ_LOOKUP_BASE_URL deve ser uma URL HTTPS válida em produção.",
+                id="core.E011",
+            )
+        )
+
     if "*" in settings.ALLOWED_HOSTS or not settings.ALLOWED_HOSTS:
         messages.append(Error("ALLOWED_HOSTS deve listar somente hosts explícitos em produção.", id="core.E007"))
     if not settings.CSRF_TRUSTED_ORIGINS:

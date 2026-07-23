@@ -142,6 +142,7 @@ class Boleto(UUIDModel, TimeStampedModel):
             ),
         ]
         indexes = [
+            models.Index(fields=["-created_at"], name="boleto_created_desc_idx"),
             models.Index(fields=["seller", "status"], name="boleto_seller_status_idx"),
             models.Index(fields=["due_date"], name="boleto_due_date_idx"),
             models.Index(fields=["company", "created_at"], name="boleto_company_created_idx"),

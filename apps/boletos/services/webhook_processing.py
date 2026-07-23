@@ -140,6 +140,13 @@ def process_boleto_event(event: WebhookEvent, normalized, boleto: Boleto | None)
             boleto.save(update_fields=[*dict.fromkeys(changed_fields), "updated_at"])
 
         _finish_event(event, ProcessingStatus.PROCESSED, boleto=boleto)
+        logger.info(
+            "boleto_webhook_processed=true boleto=%s event=%s provider_event=%s status=%s",
+            boleto.id,
+            event.event_type,
+            event.provider_event_id,
+            boleto.status,
+        )
         if status_changed and target_status in NOTIFICATION_EVENTS:
             transaction.on_commit(
                 lambda boleto_id=boleto.id, notification_event=NOTIFICATION_EVENTS[
