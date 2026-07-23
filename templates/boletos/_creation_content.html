@@ -1,0 +1,97 @@
+{% load formatting %}
+<style>
+.boleto-card{max-width:920px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;border-radius:18px;padding:24px}
+.boleto-steps{display:flex;gap:8px;margin-bottom:22px}.boleto-steps span{flex:1;padding:9px;text-align:center;border-radius:9px;background:#eef2f7;font-size:.78rem;font-weight:600}.boleto-steps .active{background:#0b3b82;color:#fff}
+.boleto-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.boleto-field{display:flex;flex-direction:column;gap:6px}.boleto-field.full{grid-column:1/-1}.boleto-field label{font-size:.78rem;font-weight:650}.boleto-field input,.boleto-field select,.boleto-field textarea{min-height:44px;border:1px solid #cbd5e1;border-radius:9px;padding:10px 12px;background:#fff;color:#172033}.boleto-field textarea{min-height:78px}
+.boleto-errors{color:#b42318;font-size:.73rem}.boleto-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}.boleto-btn{min-height:44px;border:0;border-radius:10px;padding:0 18px;background:#0b3b82;color:#fff;font-weight:700;cursor:pointer}.boleto-btn.secondary{background:#e8edf5;color:#17345e}.boleto-alert{padding:12px;border-radius:9px;background:#fef3f2;color:#b42318;margin-bottom:14px}
+.boleto-review{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.boleto-review div{padding:12px;background:#f7f9fc;border-radius:9px}.boleto-review small{display:block;color:#667085;margin-bottom:4px}.boleto-review .full{grid-column:1/-1}
+@media(max-width:700px){.boleto-card{padding:16px}.boleto-grid,.boleto-review{grid-template-columns:1fr}.boleto-field.full,.boleto-review .full{grid-column:auto}.boleto-steps{overflow:auto}.boleto-steps span{min-width:100px}.boleto-actions{flex-direction:column}.boleto-btn{width:100%}}
+</style>
+<section class="boleto-card">
+    {% if creation_error %}<div class="boleto-alert" role="alert">{{ creation_error }}</div>{% endif %}
+    {% if review %}
+    <div class="boleto-steps"><span>1. Empresa</span><span>2. Cobrança</span><span class="active">3. Revisão</span><span>4. Resultado</span></div>
+    <h2>Confirme antes de emitir</h2>
+    <p>O boleto só será enviado ao Pagar.me depois desta confirmação.</p>
+    <div class="boleto-review">
+        <div><small>Razão social</small>{{ review.legal_name }}</div>
+        <div><small>CNPJ</small>{{ review.cnpj }}</div>
+        <div class="full"><small>Endereço</small>{{ review.street }}, {{ review.number }} — {{ review.district }}, {{ review.city }}/{{ review.state }} — CEP {{ review.zip_code }}</div>
+        <div><small>Vendedor</small>{{ review.seller_name }}</div>
+        <div><small>Valor</small>{{ review.amount_cents|format_brl }}</div>
+        <div><small>Vencimento</small>{{ review.due_date }}</div>
+        <div><small>Referência</small>{{ review.internal_reference|default:"—" }}</div>
+        <div class="full"><small>Descrição</small>{{ review.description }}</div>
+        <div class="full"><small>Destinatários previstos</small>Vendedor responsável e empresa sacada, conforme configuração de notificações.</div>
+    </div>
+    <div class="boleto-actions">
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit">
+        <input type="hidden" name="review_token" value="{{ review_token }}">
+        <button type="submit" class="boleto-btn secondary">Voltar e corrigir</button>
+    </form>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm">
+        <input type="hidden" name="review_token" value="{{ review_token }}">
+        <button type="submit" class="boleto-btn" data-confirm-button>Confirmar e emitir boleto</button>
+    </form>
+    </div>
+    {% else %}
+    <div class="boleto-steps"><span class="active">1. Empresa</span><span class="active">2. Cobrança</span><span>3. Revisão</span><span>4. Resultado</span></div>
+    <form method="post" id="boletoForm" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="review">
+        {% if form.non_field_errors %}<div class="boleto-alert">{{ form.non_field_errors }}</div>{% endif %}
+        <h2>Empresa</h2>
+        <div class="boleto-grid">
+            <div class="boleto-field full"><label for="id_cnpj">CNPJ</label><div style="display:flex;gap:8px"><input id="id_cnpj" name="cnpj" value="{{ form.cnpj.value|default:'' }}" required style="flex:1"><button class="boleto-btn secondary" type="button" id="lookupCnpj">Buscar CNPJ</button></div><span id="cnpjStatus" aria-live="polite"></span><span class="boleto-errors">{{ form.cnpj.errors }}</span></div>
+            <div class="boleto-field"><label for="id_legal_name">Razão social</label><input id="id_legal_name" name="legal_name" value="{{ form.legal_name.value|default:'' }}" required><span class="boleto-errors">{{ form.legal_name.errors }}</span></div>
+            <div class="boleto-field"><label for="id_trade_name">Nome fantasia</label><input id="id_trade_name" name="trade_name" value="{{ form.trade_name.value|default:'' }}"><span class="boleto-errors">{{ form.trade_name.errors }}</span></div>
+            <div class="boleto-field"><label for="id_email">E-mail</label><input type="email" id="id_email" name="email" value="{{ form.email.value|default:'' }}" required><span class="boleto-errors">{{ form.email.errors }}</span></div>
+            <div class="boleto-field"><label for="id_phone">Telefone</label><input id="id_phone" name="phone" value="{{ form.phone.value|default:'' }}" required><span class="boleto-errors">{{ form.phone.errors }}</span></div>
+            <div class="boleto-field"><label for="id_whatsapp_phone">WhatsApp</label><input id="id_whatsapp_phone" name="whatsapp_phone" value="{{ form.whatsapp_phone.value|default:'' }}"><span class="boleto-errors">{{ form.whatsapp_phone.errors }}</span></div>
+            <div class="boleto-field"><label for="id_zip_code">CEP</label><input id="id_zip_code" name="zip_code" value="{{ form.zip_code.value|default:'' }}" required><span class="boleto-errors">{{ form.zip_code.errors }}</span></div>
+            <div class="boleto-field"><label for="id_street">Logradouro</label><input id="id_street" name="street" value="{{ form.street.value|default:'' }}" required><span class="boleto-errors">{{ form.street.errors }}</span></div>
+            <div class="boleto-field"><label for="id_number">Número</label><input id="id_number" name="number" value="{{ form.number.value|default:'' }}" required><span class="boleto-errors">{{ form.number.errors }}</span></div>
+            <div class="boleto-field"><label for="id_complement">Complemento</label><input id="id_complement" name="complement" value="{{ form.complement.value|default:'' }}"></div>
+            <div class="boleto-field"><label for="id_district">Bairro</label><input id="id_district" name="district" value="{{ form.district.value|default:'' }}" required><span class="boleto-errors">{{ form.district.errors }}</span></div>
+            <div class="boleto-field"><label for="id_city">Cidade</label><input id="id_city" name="city" value="{{ form.city.value|default:'' }}" required><span class="boleto-errors">{{ form.city.errors }}</span></div>
+            <div class="boleto-field"><label for="id_state">Estado</label><input id="id_state" name="state" maxlength="2" value="{{ form.state.value|default:'' }}" required><span class="boleto-errors">{{ form.state.errors }}</span></div>
+        </div>
+        <h2>Cobrança</h2>
+        <div class="boleto-grid">
+            {% if sellers %}<div class="boleto-field full"><label for="id_seller_id">Vendedor responsável</label><select id="id_seller_id" name="seller_id" required><option value="">Selecione</option>{% for item in sellers %}<option value="{{ item.id }}" {% if form.seller_id.value|stringformat:"s" == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select><span class="boleto-errors">{{ form.seller_id.errors }}</span></div>{% endif %}
+            <div class="boleto-field"><label for="id_amount_display">Valor</label><input id="id_amount_display" name="amount_display" inputmode="decimal" placeholder="0,00" value="{{ form.amount_display.value|default:'' }}" required><span class="boleto-errors">{{ form.amount_display.errors }}</span></div>
+            <div class="boleto-field"><label for="id_due_date">Vencimento</label><input type="date" id="id_due_date" name="due_date" min="{{ minimum_due_date }}" value="{{ form.due_date.value|default:'' }}" required><span class="boleto-errors">{{ form.due_date.errors }}</span></div>
+            <div class="boleto-field full"><label for="id_description">Descrição</label><input id="id_description" name="description" maxlength="255" value="{{ form.description.value|default:'' }}" required><span class="boleto-errors">{{ form.description.errors }}</span></div>
+            <div class="boleto-field"><label for="id_internal_reference">Referência interna</label><input id="id_internal_reference" name="internal_reference" value="{{ form.internal_reference.value|default:'' }}"></div>
+            <div class="boleto-field"><label for="id_internal_notes">Observação interna</label><textarea id="id_internal_notes" name="internal_notes">{{ form.internal_notes.value|default:'' }}</textarea></div>
+        </div>
+        <div class="boleto-actions"><button class="boleto-btn" type="submit">Revisar boleto</button></div>
+    </form>
+    {% endif %}
+</section>
+<script>
+(function(){
+  var lookup=document.getElementById('lookupCnpj'); if(!lookup)return;
+  var status=document.getElementById('cnpjStatus'), controller;
+  lookup.addEventListener('click',async function(){
+    var cnpj=document.getElementById('id_cnpj').value.replace(/\D/g,'');
+    if(cnpj.length!==14){status.textContent='Informe um CNPJ com 14 dígitos.';return}
+    if(controller)controller.abort(); controller=new AbortController();
+    lookup.disabled=true;status.textContent='Consultando…';
+    try{
+      var response=await fetch('/api/v1/boletos/cnpj/'+cnpj+'/',{signal:controller.signal,headers:{'Accept':'application/json'}});
+      var body=await response.json();
+      if(!response.ok)throw new Error(body.error?.message||'Não foi possível consultar o CNPJ.');
+      var data=body.data,map={legal_name:'legal_name',trade_name:'trade_name',email:'email',phone:'phone',zip_code:'zip_code',street:'street',number:'number',complement:'complement',district:'district',city:'city',state:'state'};
+      Object.keys(map).forEach(function(key){var input=document.getElementById('id_'+map[key]);if(input&&!input.value)input.value=data[key]||''});
+      status.textContent='Dados encontrados. Revise e complete os campos.';
+    }catch(error){if(error.name!=='AbortError')status.textContent=error.message}
+    finally{lookup.disabled=false}
+  });
+  var confirm=document.querySelector('[data-confirm-button]');if(confirm)confirm.closest('form').addEventListener('submit',function(){confirm.disabled=true;confirm.textContent='Emitindo…'});
+})();
+</script>

@@ -63,6 +63,9 @@
                 <a href="/app/" class="{% if active_tab == 'new' %}active{% endif %}" {% if active_tab == 'new' %}aria-current="page"{% endif %}>
                     <span class="nav__icon"><img src="{% static 'ui-icons/link.svg' %}" alt="" width="20" height="20"></span><span>Criar</span>
                 </a>
+                <a href="{% url 'boletos:seller_create' %}" class="{% if active_tab == 'boleto' %}active{% endif %}" {% if active_tab == 'boleto' %}aria-current="page"{% endif %}>
+                    <span class="nav__icon"><img src="{% static 'ui-icons/payment.svg' %}" alt="" width="20" height="20"></span><span>Boleto</span>
+                </a>
                 <a href="/app/historico/" class="{% if active_tab == 'history' %}active{% endif %}" {% if active_tab == 'history' %}aria-current="page"{% endif %}>
                     <span class="nav__icon"><img src="{% static 'ui-icons/calendar.svg' %}" alt="" width="20" height="20"></span><span>Histórico</span>
                 </a>

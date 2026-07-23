@@ -1,0 +1,22 @@
+{% load formatting %}
+<style>
+.boleto-result{max-width:780px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;border-radius:18px;padding:24px}.boleto-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.boleto-result-grid div{padding:12px;background:#f7f9fc;border-radius:9px;overflow-wrap:anywhere}.boleto-result-grid small{display:block;color:#667085;margin-bottom:4px}.boleto-result-grid .full{grid-column:1/-1}.boleto-result-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.boleto-result-actions a,.boleto-result-actions button{min-height:42px;border:0;border-radius:9px;padding:10px 14px;background:#0b3b82;color:#fff;text-decoration:none;font-weight:650;cursor:pointer}@media(max-width:650px){.boleto-result{padding:16px}.boleto-result-grid{grid-template-columns:1fr}.boleto-result-grid .full{grid-column:auto}}
+</style>
+<section class="boleto-result">
+    <h2>{{ boleto.get_status_display }}</h2>
+    {% if boleto.status == "CREATION_UNKNOWN" %}<p>Estamos confirmando a emissão com o Pagar.me. Não crie outro boleto para esta cobrança.</p>{% endif %}
+    <div class="boleto-result-grid">
+        <div><small>Empresa</small>{{ boleto.company_snapshot.legal_name }}</div>
+        <div><small>CNPJ</small>{{ boleto.company_snapshot.cnpj }}</div>
+        <div><small>Vendedor</small>{{ boleto.seller.name }}</div>
+        <div><small>Valor</small>{{ boleto.amount_cents|format_brl }}</div>
+        <div><small>Vencimento</small>{{ boleto.due_date|date:"d/m/Y" }}</div>
+        <div><small>Referência</small>{{ boleto.internal_reference|default:"—" }}</div>
+        <div class="full"><small>Linha digitável</small><span id="digitableLine">{{ boleto.digitable_line|default:"Aguardando confirmação" }}</span></div>
+        {% if boleto.barcode %}<div class="full"><small>Código de barras</small>{{ boleto.barcode }}</div>{% endif %}
+    </div>
+    <div class="boleto-result-actions">
+        {% if boleto.digitable_line %}<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('digitableLine').textContent)">Copiar linha digitável</button>{% endif %}
+        {% if boleto.pdf_url %}<a href="{{ boleto.pdf_url }}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>{% endif %}
+    </div>
+</section>
