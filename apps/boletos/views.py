@@ -12,12 +12,55 @@ from apps.admin_panel.views import admin_required
 from apps.boletos.forms import BoletoCreationForm
 from apps.boletos.models import Boleto
 from apps.boletos.permissions import BoletoActor, resolve_creation_seller, scope_boletos
+from apps.boletos.selectors import boleto_list_page, boleto_metrics
 from apps.boletos.services.boleto_creation import BoletoCreationData, create_boleto
+from apps.notifications.models import WhatsAppMessage
 from apps.sellers.decorators import seller_login_required
 from apps.sellers.models import Seller
 
 REVIEW_SALT = "boletos.creation.review.v1"
 REVIEW_MAX_AGE_SECONDS = 60 * 60
+
+
+@admin_required
+def manager_boleto_list(request):
+    actor = BoletoActor(user=request.user)
+    page, query_without_page = boleto_list_page(actor=actor, params=request.GET)
+    return render(
+        request,
+        "panel/boletos/list.html",
+        {
+            "active_page": "boletos",
+            "page_obj": page,
+            "boletos": page.object_list,
+            "metrics": boleto_metrics(actor=actor),
+            "sellers": Seller.objects.filter(is_active=True).order_by("name"),
+            "status_choices": Boleto._meta.get_field("status").choices,
+            "filters": request.GET,
+            "query_without_page": query_without_page,
+            "is_manager": True,
+        },
+    )
+
+
+@seller_login_required
+def seller_boleto_list(request):
+    actor = BoletoActor(seller=request.seller)
+    page, query_without_page = boleto_list_page(actor=actor, params=request.GET)
+    return render(
+        request,
+        "sellers/boletos/list.html",
+        {
+            "seller": request.seller,
+            "active_tab": "boleto",
+            "page_obj": page,
+            "boletos": page.object_list,
+            "metrics": boleto_metrics(actor=actor),
+            "status_choices": Boleto._meta.get_field("status").choices,
+            "filters": request.GET,
+            "query_without_page": query_without_page,
+        },
+    )
 
 
 @admin_required
@@ -47,11 +90,22 @@ def seller_create_boleto(request):
 
 @admin_required
 def manager_boleto_detail(request, boleto_id):
+    actor = BoletoActor(user=request.user)
     boleto = get_object_or_404(
-        scope_boletos(Boleto.objects.select_related("company", "seller"), actor=BoletoActor(user=request.user)),
+        scope_boletos(Boleto.objects.select_related("company", "seller"), actor=actor),
         id=boleto_id,
     )
-    return render(request, "panel/boletos/detail.html", {"boleto": boleto})
+    return render(
+        request,
+        "panel/boletos/detail.html",
+        {
+            "active_page": "boletos",
+            "boleto": boleto,
+            "webhook_events": boleto.webhook_events.order_by("-received_at"),
+            "notification_events": _notification_history(boleto),
+            "show_technical": True,
+        },
+    )
 
 
 @seller_login_required
@@ -66,8 +120,18 @@ def seller_boleto_detail(request, boleto_id):
     return render(
         request,
         "sellers/boletos/detail.html",
-        {"boleto": boleto, "seller": request.seller, "active_tab": "boleto"},
+        {
+            "boleto": boleto,
+            "seller": request.seller,
+            "active_tab": "boleto",
+            "notification_events": _notification_history(boleto),
+            "show_technical": False,
+        },
     )
+
+
+def _notification_history(boleto):
+    return WhatsAppMessage.objects.filter(boleto=boleto).order_by("-created_at")
 
 
 def _creation_flow(request, *, actor, template_name, detail_route, sellers=None):

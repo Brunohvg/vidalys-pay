@@ -1,5 +1,8 @@
 {% extends "sellers/app_base.html" %}
+{% load static %}
 {% block title %}Boleto — Vidalys Pay{% endblock %}
 {% block greeting %}<span class="app-page-heading__eyebrow">Resultado da emissão</span>{% endblock %}
 {% block page_title %}Boleto{% endblock %}
+{% block page_description %}<p>{{ boleto.company.legal_name }}</p>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
 {% block content %}{% include "boletos/_detail_content.html" %}{% endblock %}

@@ -1,4 +1,7 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block title %}Boleto{% endblock %}
 {% block page_title %}Detalhes do boleto{% endblock %}
+{% block page_description %}<p>{{ boleto.company.legal_name }} · {{ boleto.internal_reference|default:"Sem referência" }}</p>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
 {% block content %}{% include "boletos/_detail_content.html" %}{% endblock %}

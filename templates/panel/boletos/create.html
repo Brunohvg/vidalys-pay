@@ -1,5 +1,7 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block title %}Criar boleto{% endblock %}
 {% block page_title %}Novo boleto{% endblock %}
 {% block page_description %}<p>Emissão exclusiva para empresas com CNPJ.</p>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
 {% block content %}{% include "boletos/_creation_content.html" %}{% endblock %}

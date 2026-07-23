@@ -1,0 +1,8 @@
+{% extends "panel/base.html" %}
+{% load static %}
+{% block title %}Boletos{% endblock %}
+{% block page_title %}Boletos{% endblock %}
+{% block page_description %}<p>Acompanhe emissões, vencimentos e recebimentos.</p>{% endblock %}
+{% block header_action %}<a class="boleto-header-action" href="{% url 'boletos:manager_create' %}">Novo boleto</a>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
+{% block content %}{% include "boletos/_list_content.html" %}{% endblock %}

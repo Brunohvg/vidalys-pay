@@ -1,0 +1,9 @@
+{% extends "sellers/app_base.html" %}
+{% load static %}
+{% block title %}Boletos — Vidalys Pay{% endblock %}
+{% block greeting %}<span class="app-page-heading__eyebrow">Cobranças empresariais</span>{% endblock %}
+{% block page_title %}Boletos{% endblock %}
+{% block page_description %}<p>Acompanhe emissões, vencimentos e pagamentos.</p>{% endblock %}
+{% block page_action %}<a class="boleto-header-action" href="{% url 'boletos:seller_create' %}">Novo</a>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/boletos.css' %}">{% endblock %}
+{% block content %}{% include "boletos/_list_content.html" %}{% endblock %}

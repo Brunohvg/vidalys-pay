@@ -1,10 +1,10 @@
 {% load formatting %}
-<style>
-.boleto-result{max-width:780px;margin:0 auto;background:#fff;border:1px solid #dfe5ee;border-radius:18px;padding:24px}.boleto-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.boleto-result-grid div{padding:12px;background:#f7f9fc;border-radius:9px;overflow-wrap:anywhere}.boleto-result-grid small{display:block;color:#667085;margin-bottom:4px}.boleto-result-grid .full{grid-column:1/-1}.boleto-result-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.boleto-result-actions a,.boleto-result-actions button{min-height:42px;border:0;border-radius:9px;padding:10px 14px;background:#0b3b82;color:#fff;text-decoration:none;font-weight:650;cursor:pointer}@media(max-width:650px){.boleto-result{padding:16px}.boleto-result-grid{grid-template-columns:1fr}.boleto-result-grid .full{grid-column:auto}}
-</style>
 <section class="boleto-result">
-    <h2>{{ boleto.get_status_display }}</h2>
-    {% if boleto.status == "CREATION_UNKNOWN" %}<p>Estamos confirmando a emissão com o Pagar.me. Não crie outro boleto para esta cobrança.</p>{% endif %}
+    <header class="boleto-result__header">
+        <div><span>Situação atual</span><h2>{{ boleto.get_status_display }}</h2></div>
+        <span class="boleto-status boleto-status--{{ boleto.status|lower }}">{{ boleto.get_status_display }}</span>
+    </header>
+    {% if boleto.status == "CREATION_UNKNOWN" %}<div class="boleto-notice">Estamos confirmando a emissão com o Pagar.me. Não crie outro boleto para esta cobrança.</div>{% endif %}
     <div class="boleto-result-grid">
         <div><small>Empresa</small>{{ boleto.company_snapshot.legal_name }}</div>
         <div><small>CNPJ</small>{{ boleto.company_snapshot.cnpj }}</div>
@@ -12,11 +12,44 @@
         <div><small>Valor</small>{{ boleto.amount_cents|format_brl }}</div>
         <div><small>Vencimento</small>{{ boleto.due_date|date:"d/m/Y" }}</div>
         <div><small>Referência</small>{{ boleto.internal_reference|default:"—" }}</div>
+        <div class="full"><small>Descrição</small>{{ boleto.description }}</div>
         <div class="full"><small>Linha digitável</small><span id="digitableLine">{{ boleto.digitable_line|default:"Aguardando confirmação" }}</span></div>
         {% if boleto.barcode %}<div class="full"><small>Código de barras</small>{{ boleto.barcode }}</div>{% endif %}
     </div>
     <div class="boleto-result-actions">
-        {% if boleto.digitable_line %}<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('digitableLine').textContent)">Copiar linha digitável</button>{% endif %}
+        {% if boleto.digitable_line %}<button type="button" data-copy-line>Copiar linha digitável</button>{% endif %}
         {% if boleto.pdf_url %}<a href="{{ boleto.pdf_url }}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>{% endif %}
+        {% if show_technical %}<a class="secondary" href="{% url 'boletos:manager_list' %}">Voltar à lista</a>{% else %}<a class="secondary" href="{% url 'boletos:seller_list' %}">Voltar à lista</a>{% endif %}
     </div>
 </section>
+
+<section class="boleto-history">
+    <h2>Notificações</h2>
+    {% for item in notification_events %}
+    <article><span class="boleto-history__dot"></span><div><strong>{{ item.get_recipient_type_display }} · {{ item.get_status_display }}</strong><small>{{ item.created_at|date:"d/m/Y H:i" }} · {{ item.event_type }}</small></div></article>
+    {% empty %}<p class="boleto-history__empty">Nenhuma notificação registrada.</p>{% endfor %}
+</section>
+
+{% if show_technical %}
+<section class="boleto-history">
+    <h2>Eventos do Pagar.me</h2>
+    {% for event in webhook_events %}
+    <details class="boleto-technical-event">
+        <summary><span>{{ event.event_type }}</span><small>{{ event.get_processing_status_display }} · {{ event.received_at|date:"d/m/Y H:i" }}</small></summary>
+        <dl><div><dt>ID externo</dt><dd>{{ event.provider_event_id|default:"—" }}</dd></div><div><dt>Tentativas</dt><dd>{{ event.attempts }}</dd></div></dl>
+        <pre>{{ event.payload }}</pre>
+    </details>
+    {% empty %}<p class="boleto-history__empty">Nenhum webhook associado.</p>{% endfor %}
+</section>
+{% endif %}
+
+<script>
+(function(){
+  var button=document.querySelector('[data-copy-line]');
+  if(!button)return;
+  button.addEventListener('click',async function(){
+    try{await navigator.clipboard.writeText(document.getElementById('digitableLine').textContent);button.textContent='Linha copiada';}
+    catch(error){button.textContent='Não foi possível copiar';}
+  });
+})();
+</script>
