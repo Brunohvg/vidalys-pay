@@ -854,3 +854,121 @@
         font-size: .78rem;
     }
 }
+
+/* Panel density pass. Seller mobile remains intentionally touch-friendly. */
+.admin-body .boleto-header-action {
+    min-height: 38px;
+    padding-inline: var(--space-3);
+    font-size: var(--text-xs);
+}
+
+.admin-body .boleto-metrics {
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.admin-body .boleto-metric {
+    padding: 13px 14px;
+    border-radius: 14px;
+}
+
+.admin-body .boleto-metric strong {
+    font-size: 1.12rem;
+}
+
+.admin-body .boleto-filters {
+    margin-bottom: 14px;
+    padding: 14px;
+    border-radius: 14px;
+}
+
+.admin-body .boleto-search {
+    min-height: 40px;
+}
+
+.admin-body .boleto-filter-grid {
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.admin-body .boleto-filter-grid input,
+.admin-body .boleto-filter-grid select,
+.admin-body .boleto-field input,
+.admin-body .boleto-field select {
+    min-height: 40px;
+}
+
+.admin-body .boleto-filter-actions,
+.admin-body .boleto-actions,
+.admin-body .boleto-result-actions {
+    margin-top: 13px;
+}
+
+.admin-body .boleto-filter-actions button,
+.admin-body .boleto-filter-actions a,
+.admin-body .boleto-btn,
+.admin-body .boleto-result-actions a,
+.admin-body .boleto-result-actions button {
+    min-height: 38px;
+    padding: 7px 14px;
+    font-size: var(--text-xs);
+}
+
+.admin-body .boleto-list {
+    gap: 10px;
+}
+
+.admin-body .boleto-list-heading {
+    margin: 17px 0 10px;
+}
+
+.admin-body .boleto-list-card {
+    border-radius: 14px;
+}
+
+.admin-body .boleto-card,
+.admin-body .boleto-result,
+.admin-body .boleto-history {
+    padding: 18px;
+    border-radius: 15px;
+}
+
+.admin-body .boleto-steps {
+    margin-bottom: 17px;
+}
+
+.admin-body .boleto-card h2:not(:first-child) {
+    margin-top: 19px;
+}
+
+@media (min-width: 1024px) {
+    .admin-body .boleto-list-card {
+        grid-template-columns: minmax(220px, 1.45fr) minmax(120px, .5fr) minmax(250px, 1fr) auto;
+        gap: 16px;
+        padding: 13px 16px;
+    }
+
+    .admin-body .boleto-list-card__amount {
+        font-size: 1.12rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .admin-body .boleto-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-body .boleto-metric {
+        padding: 11px 12px;
+    }
+
+    .admin-body .boleto-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-body .boleto-card,
+    .admin-body .boleto-result,
+    .admin-body .boleto-history {
+        padding: 15px;
+    }
+}
