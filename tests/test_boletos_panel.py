@@ -82,6 +82,7 @@ def test_manager_list_filters_searches_orders_and_paginates(
     manager,
     sellers,
     companies,
+    django_assert_max_num_queries,
 ):
     client.force_login(manager)
     for index in range(23):
@@ -92,7 +93,8 @@ def test_manager_list_filters_searches_orders_and_paginates(
             status=BoletoStatus.PAID if index % 3 == 0 else BoletoStatus.PENDING,
         )
 
-    first_page = client.get(reverse("boletos:manager_list"))
+    with django_assert_max_num_queries(8):
+        first_page = client.get(reverse("boletos:manager_list"))
     filtered = client.get(
         reverse("boletos:manager_list"),
         {

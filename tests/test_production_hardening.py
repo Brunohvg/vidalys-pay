@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth import get_user_model
 
+from apps.core.checks import check_production_configuration
 from apps.integrations.auth import hash_api_key
 from apps.integrations.n8n.models import ApiClient
 from apps.payment_links.models import PaymentLink, PaymentLinkStatus
@@ -103,3 +104,16 @@ def test_failed_duplicate_webhook_is_reprocessed(client, settings):
     assert response.status_code == 200
     assert response.json()["reprocessed"] is True
     process.assert_called_once_with(event)
+
+
+def test_production_check_requires_https_cnpj_provider(settings):
+    settings.DEBUG = False
+    settings.CNPJ_LOOKUP_BASE_URL = "http://cnpj.internal/api"
+
+    messages = check_production_configuration(None)
+
+    assert "core.E011" in {message.id for message in messages}
+
+    settings.CNPJ_LOOKUP_BASE_URL = "https://cnpj.internal/api"
+    messages = check_production_configuration(None)
+    assert "core.E011" not in {message.id for message in messages}

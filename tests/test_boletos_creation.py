@@ -316,6 +316,68 @@ def test_incomplete_provider_response_is_unknown(seller, creation_data):
 
 
 @pytest.mark.django_db
+def test_provider_urls_and_numeric_boleto_fields_are_sanitized(
+    seller,
+    creation_data,
+    provider_response,
+):
+    response = {
+        **provider_response,
+        "charges": [
+            {
+                **provider_response["charges"][0],
+                "last_transaction": {
+                    **provider_response["charges"][0]["last_transaction"],
+                    "line": "00190.00009 00000.000000",
+                    "barcode": "00190 12345",
+                    "pdf": "javascript:alert(document.domain)",
+                },
+            }
+        ],
+    }
+    client = Mock()
+    client.create_boleto_order.return_value = response
+
+    result = create_boleto(
+        seller=seller,
+        actor_seller=seller,
+        data=creation_data,
+        idempotency_key="sanitize-provider-response",
+        client=client,
+    )
+
+    assert result.success
+    assert result.boleto.digitable_line == "001900000900000000000"
+    assert result.boleto.barcode == "0019012345"
+    assert result.boleto.pdf_url == ""
+
+
+@pytest.mark.django_db
+def test_oversized_provider_identifier_keeps_creation_uncertain(
+    seller,
+    creation_data,
+    provider_response,
+):
+    client = Mock()
+    client.create_boleto_order.return_value = {
+        **provider_response,
+        "id": "x" * 101,
+    }
+
+    result = create_boleto(
+        seller=seller,
+        actor_seller=seller,
+        data=creation_data,
+        idempotency_key="oversized-provider-id",
+        client=client,
+    )
+
+    assert result.uncertain
+    assert result.boleto.status == BoletoStatus.CREATION_UNKNOWN
+    assert result.boleto.provider_order_id is None
+
+
+@pytest.mark.django_db
 def test_existing_company_is_reused_and_updated(seller, creation_data, provider_response):
     Company.objects.create(
         cnpj=VALID_CNPJ,

@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.sellers.models import Seller
 from apps.webhooks.models import ProcessingStatus, WebhookEvent
+from apps.webhooks.pagarme_payload import normalize_event
 from apps.webhooks.processor import process_webhook_event
 
 
@@ -228,3 +229,25 @@ def test_endpoint_authentication_and_duplicate_delivery(settings, client, boleto
     assert duplicate.status_code == 200
     assert duplicate.json()["duplicate"] is True
     assert WebhookEvent.objects.count() == 1
+
+
+def test_normalizer_tolerates_malformed_nested_provider_data():
+    normalized = normalize_event(
+        {
+            "id": "hook_malformed",
+            "type": "charge.updated",
+            "data": {
+                "id": {"unexpected": "object"},
+                "order": [],
+                "charges": ["invalid"],
+                "metadata": {"internal_boleto_id": {"not": "scalar"}},
+                "status": ["invalid"],
+            },
+        }
+    )
+
+    assert normalized.order_id is None
+    assert normalized.charge_id is None
+    assert normalized.transaction_id is None
+    assert normalized.internal_boleto_id is None
+    assert normalized.status is None
