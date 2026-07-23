@@ -39,6 +39,16 @@ Responsável por:
 - Estados e transições
 - API REST
 
+### Boletos (`apps/boletos`)
+
+Responsável por:
+- Empresas identificadas por CNPJ normalizado
+- Consulta da BrasilAPI e normalização da resposta
+- Emissão idempotente pelo cliente Pagar.me existente
+- Snapshot histórico dos dados usados na cobrança
+- Painéis, filtros, métricas e escopo por perfil
+- Reconciliação de status a partir do webhook compartilhado
+
 ### Webhooks (`apps/webhooks`)
 
 Responsável por:
@@ -100,10 +110,12 @@ Módulo reservado para futura implementação de calculadora de frete.
 3. Persistência do evento bruto
 4. Verificação de duplicidade
 5. Mapeamento do evento
-6. Atualização de PaymentLink/PaymentAttempt
+6. Roteamento para Boleto ou atualização de PaymentLink/PaymentAttempt
 7. Inserção de notificações no outbox
 8. Resposta 200
 ```
+
+Detalhes do fluxo de boletos: [`BOLETOS.md`](BOLETOS.md).
 
 ### Fluxo de Autenticação
 

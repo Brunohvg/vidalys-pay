@@ -45,11 +45,11 @@ Authorization: Bearer vly_live_xxxxx
 
 ```python
 # Autenticação
-Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:)
+Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD)
 ```
 
 - Username: segredo configurado no painel Pagar.me
-- Password: vazio
+- Password: segredo forte e independente
 
 ## Autorização
 
@@ -61,6 +61,7 @@ links = PaymentLink.objects.filter(seller=request.seller)
 ```
 
 - Vendedor só acessa seus próprios recursos
+- Vendedor só acessa os próprios boletos e nunca recebe o payload técnico
 - IDs UUID não substituem autorização
 - Vendedor não acessa Django Admin
 

@@ -14,6 +14,8 @@ O **Vidalys Pay** é uma aplicação interna para vendedores criarem links de pa
 ### Funcionalidades
 
 - Criação de links de pagamento (1x, 2x, 3x sem juros)
+- Emissão e acompanhamento de boletos empresariais por CNPJ
+- Consulta de CNPJ com autopreenchimento e revisão antes da emissão
 - Envio automático via WhatsApp
 - Acompanhamento em tempo real via webhooks
 - Histórico de transações
@@ -113,6 +115,9 @@ docker compose up --build
 | `DATABASE_URL` | URL do PostgreSQL | Sim |
 | `PAGARME_SECRET_KEY` | Chave Pagar.me | Sim |
 | `PAGARME_WEBHOOK_BASIC_AUTH_USER` | Usuário Basic Auth webhook | Sim |
+| `PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD` | Senha forte do webhook | Sim |
+| `CNPJ_LOOKUP_BASE_URL` | Endpoint HTTPS da consulta de CNPJ | Para boletos |
+| `BOLETO_MANAGER_WHATSAPP_PHONES` | Gestores notificados, separados por vírgula | Não |
 | `EVOLUTION_API_URL` | URL da Evolution API | Sim |
 | `EVOLUTION_API_KEY` | Chave da Evolution API | Sim |
 | `EVOLUTION_INSTANCE` | Nome da instância | Sim |
@@ -132,6 +137,7 @@ vidalys-pay/
 │   ├── core/                 # Configurações comuns, health, logging
 │   ├── sellers/              # Vendedores, convites e sessões
 │   ├── payment_links/        # Links e tentativas de pagamento
+│   ├── boletos/              # Empresas, emissão, consulta e painel de boletos
 │   ├── webhooks/             # Entrada e processamento de webhooks
 │   ├── notifications/        # Mensagens, templates e outbox
 │   ├── integrations/
@@ -168,6 +174,7 @@ vidalys-pay/
 | GET | `/api/v1/payment-links/{id}/` | Detalhar link |
 | POST | `/api/v1/payment-links/{id}/resend/` | Reenviar link |
 | POST | `/api/v1/webhooks/pagarme/` | Webhook Pagar.me |
+| GET | `/api/v1/boletos/cnpj/{cnpj}/` | Consulta autenticada de CNPJ |
 | GET | `/health/` | Health check |
 | GET | `/health/ready/` | Readiness check |
 
@@ -254,6 +261,7 @@ curl -s https://pay.vidalys.com.br/health/ready/
 - A rede `coolify` deve ser externa (`external: true`) no compose
 
 Veja `RUNBOOK.md` para procedimentos operacionais.
+O fluxo completo de boletos está documentado em [`docs/BOLETOS.md`](docs/BOLETOS.md).
 
 ## Comandos Úteis
 

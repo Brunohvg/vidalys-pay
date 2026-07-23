@@ -41,6 +41,7 @@
 | APP_BASE_URL | URL base da aplicação |
 | PAGARME_SECRET_KEY | Chave Pagar.me |
 | PAGARME_WEBHOOK_BASIC_AUTH_USER | Usuário Basic Auth webhook |
+| PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD | Senha forte do webhook |
 | EVOLUTION_API_URL | URL da Evolution API |
 | EVOLUTION_API_KEY | Chave da Evolution API |
 | EVOLUTION_INSTANCE | Nome da instância Evolution |
@@ -62,6 +63,10 @@
 | WEBPUSH_VAPID_SUBJECT | mailto:contato@vidalys.com.br | Contato VAPID |
 | INVITATION_EXPIRATION_HOURS | 24 | Validade do convite |
 | SELLER_SESSION_DAYS | 30 | Validade da sessão |
+| CNPJ_LOOKUP_BASE_URL | BrasilAPI | Endpoint HTTPS de consulta de CNPJ |
+| BOLETO_MANAGER_WHATSAPP_PHONES | vazio | Telefones de gestores separados por vírgula |
+| BOLETO_NOTIFY_CUSTOMER_ON_PAID | false | Confirma pagamento ao cliente |
+| BOLETO_NOTIFY_CUSTOMER_ON_CANCELED | false | Informa cancelamento ao cliente |
 
 ## Comandos
 
@@ -136,6 +141,9 @@ docker compose logs web --tail=50
 
 **Solução:** Reprocessar pelo admin → Webhooks → Selecionar → Reprocessar evento.
 
+Para boletos em `CREATION_UNKNOWN`, eventos com `BOLETO_NOT_FOUND` e histórico
+de notificações, consulte o procedimento detalhado em `docs/BOLETOS.md`.
+
 ### Erro de migrations
 
 **Causa:** Migrations pendentes ou conflito.
@@ -194,6 +202,8 @@ curl -s https://pay.vidalys.com.br/health/ready/
 
 - Tempo de resposta das telas (< 800ms p95)
 - Taxa de criação de links
+- Taxa de emissão e pagamento de boletos
+- Boletos em `CREATION_UNKNOWN`
 - Taxa de entrega WhatsApp
 - Eventos de webhook com erro
 - Itens DEAD no outbox
