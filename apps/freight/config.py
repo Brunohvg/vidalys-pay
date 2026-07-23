@@ -92,7 +92,7 @@ def get_correios_config() -> CorreiosConfig:
     """Build validated CorreiosConfig from Django settings.
 
     Only 6 env vars are consumed. Old variables (CORREIOS_DR,
-    CORREIOS_ENABLED, CORREIOS_PAC_PRODUCT_CODE, etc.) are ignored
+    CORREIOS_PAC_PRODUCT_CODE, etc.) are ignored
     with a single warning.
     """
     _warn_legacy_vars()
@@ -162,7 +162,6 @@ def _reject_placeholder(value: str, name: str) -> None:
 
 
 _LEGACY_VARS = [
-    "CORREIOS_ENABLED",
     "CORREIOS_DR",
     "CORREIOS_PAC_PRODUCT_CODE",
     "CORREIOS_SEDEX_PRODUCT_CODE",

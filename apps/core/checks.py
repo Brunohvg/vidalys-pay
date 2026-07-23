@@ -32,9 +32,12 @@ def check_production_configuration(app_configs, **kwargs):
     auth_mode = getattr(settings, "PAGARME_WEBHOOK_AUTH_MODE", "basic")
     if auth_mode != "basic":
         messages.append(Error("PAGARME_WEBHOOK_AUTH_MODE deve ser 'basic' em produção.", id="core.E003"))
-    for name in ("PAGARME_WEBHOOK_BASIC_AUTH_USER", "PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD"):
-        if _missing_or_placeholder(getattr(settings, name, ""), minimum=16):
-            messages.append(Error(f"{name} deve conter um segredo forte, sem placeholder.", id="core.E004"))
+    webhook_user = getattr(settings, "PAGARME_WEBHOOK_BASIC_AUTH_USER", "")
+    if _missing_or_placeholder(webhook_user, minimum=1):
+        messages.append(Error("PAGARME_WEBHOOK_BASIC_AUTH_USER é obrigatório e não pode ser placeholder.", id="core.E004"))
+    webhook_password = getattr(settings, "PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD", "")
+    if _missing_or_placeholder(webhook_password, minimum=16):
+        messages.append(Error("PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD deve conter um segredo forte.", id="core.E004"))
 
     for name in ("EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE"):
         if _missing_or_placeholder(getattr(settings, name, ""), minimum=3):
