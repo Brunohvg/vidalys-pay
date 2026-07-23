@@ -161,6 +161,41 @@ def test_existing_subscription_is_reactivated_and_updated(seller, settings):
 
 
 @pytest.mark.django_db
+def test_delete_subscription_is_idempotent_and_scoped_to_seller(seller, settings):
+    settings.WEBPUSH_VAPID_PUBLIC_KEY = "public"
+    settings.WEBPUSH_VAPID_PRIVATE_KEY = "private"
+    other_seller = Seller.objects.create(
+        name="Other Seller",
+        whatsapp_phone="+5531888888888",
+        max_payment_amount_cents=1000000,
+    )
+    endpoint = "https://push.example/sub"
+    subscription = PushSubscription.objects.create(
+        seller=other_seller,
+        endpoint=endpoint,
+        p256dh="key",
+        auth="auth",
+    )
+    client = _authenticated_client(seller)
+
+    first = client.delete(
+        reverse("sellers:push_subscriptions"),
+        data={"endpoint": endpoint},
+        content_type="application/json",
+    )
+    second = client.delete(
+        reverse("sellers:push_subscriptions"),
+        data={"endpoint": "https://push.example/missing"},
+        content_type="application/json",
+    )
+
+    assert first.status_code == 204
+    assert second.status_code == 204
+    subscription.refresh_from_db()
+    assert subscription.is_active
+
+
+@pytest.mark.django_db
 def test_paid_attempt_path_queues_push(payment_link, django_capture_on_commit_callbacks):
     normalized = SimpleNamespace(status="paid")
 

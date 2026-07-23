@@ -16,6 +16,9 @@ fi
 echo "[web] Aguardando PostgreSQL..."
 python docker/wait_for_database.py
 
+echo "[web] Executando verificações de produção..."
+python manage.py check --deploy --fail-level ERROR
+
 echo "[web] Executando migrations..."
 python manage.py migrate --noinput
 

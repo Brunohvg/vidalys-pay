@@ -22,11 +22,11 @@ class Command(BaseCommand):
 
         auth_header = build_basic_auth_header(api_key)
 
-        self.stdout.write(f"Credencial configurada:        sim")
+        self.stdout.write("Credencial configurada:        sim")
         self.stdout.write(f"Formato de entrada detectado:  {_detect_input_format_from_settings()}")
         self.stdout.write(f"Ambiente detectado:            {'production' if not api_key.startswith('sk_test_') else 'test'}")
-        self.stdout.write(f"Authorization presente:         sim")
-        self.stdout.write(f"Authorization schema:           Basic")
+        self.stdout.write("Authorization presente:         sim")
+        self.stdout.write("Authorization schema:           Basic")
         self.stdout.write(f"Endpoint:                       {settings.PAGARME_BASE_URL.rstrip('/')}/paymentlinks")
         self.stdout.write("")
 
@@ -36,10 +36,10 @@ class Command(BaseCommand):
                 headers={"Authorization": auth_header, "Accept": "application/json"},
                 timeout=httpx.Timeout(connect=5, read=10),
             )
-        except httpx.ConnectError:
-            raise CommandError("Falha de conexao: nao foi possivel alcancar a API Pagar.me.")
-        except httpx.TimeoutException:
-            raise CommandError("Timeout: a API Pagar.me nao respondeu a tempo.")
+        except httpx.ConnectError as exc:
+            raise CommandError("Falha de conexao: nao foi possivel alcancar a API Pagar.me.") from exc
+        except httpx.TimeoutException as exc:
+            raise CommandError("Timeout: a API Pagar.me nao respondeu a tempo.") from exc
 
         if response.status_code == 401:
             raise CommandError(

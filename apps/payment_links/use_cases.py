@@ -58,6 +58,21 @@ def create_payment_link(
             error_message="Vendedor inativo.",
         )
 
+    if not reference or len(reference) > 80 or not idempotency_key or len(idempotency_key) > 100:
+        return CreatePaymentLinkResult(
+            payment_link=None,
+            success=False,
+            error_message="Referência ou chave de idempotência inválida.",
+        )
+
+    for value, max_length in ((customer_name, 120), (customer_phone, 20), (description, 255)):
+        if value is not None and (not isinstance(value, str) or len(value) > max_length):
+            return CreatePaymentLinkResult(
+                payment_link=None,
+                success=False,
+                error_message="Dados do cliente excedem o tamanho permitido.",
+            )
+
     # Validate amount
     if amount_cents <= 0:
         return CreatePaymentLinkResult(

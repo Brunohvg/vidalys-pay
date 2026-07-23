@@ -5,8 +5,8 @@ DR is auto-resolved from the token response (not from env vars).
 Pricing/Deadline: batch POST queries.
 """
 import logging
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import httpx
@@ -57,7 +57,7 @@ def calculate_token_ttl(expira_em: Any) -> int:
             expires_at = datetime.fromisoformat(
                 expira_em.replace("Z", "+00:00")
             )
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return max(int((expires_at - now).total_seconds()), 60)
         except (ValueError, TypeError):
             return 300
@@ -432,7 +432,7 @@ class CorreiosFreightClient:
         package: PackageData,
     ) -> dict[str, int]:
         """Query deadlines for PAC and SEDEX in a single POST."""
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         parametros = []
         for service_code in DEFAULT_PRODUCTS:
             parametros.append({

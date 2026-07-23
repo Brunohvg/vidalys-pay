@@ -41,10 +41,7 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
     event_id = payload.get("id", "")
     event_type = payload.get("type", "")
 
-    if "." in event_type:
-        resource_type = event_type.split(".")[0]
-    else:
-        resource_type = ""
+    resource_type = event_type.split(".")[0] if "." in event_type else ""
 
     data = payload.get("data", {})
     if not isinstance(data, dict):

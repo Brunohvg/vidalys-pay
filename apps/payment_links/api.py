@@ -2,6 +2,7 @@
 import contextlib
 import logging
 
+from django.views.decorators.http import require_http_methods
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
@@ -9,7 +10,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.core.rate_limit import rate_limit
-from apps.integrations.auth import authenticate_api_key
+from apps.integrations.auth import authenticate_api_key, has_scope
 
 from .models import PaymentLink
 from .use_cases import create_payment_link, format_currency
@@ -17,7 +18,14 @@ from .use_cases import create_payment_link, format_currency
 logger = logging.getLogger("apps.payment_links")
 
 
-def _get_seller(request: Request):
+@require_http_methods(["GET", "POST"])
+def payment_links_collection_view(request):
+    """Route collection reads and creates to their DRF handlers."""
+    handler = list_payment_links_view if request.method == "GET" else create_payment_link_view
+    return handler(request)
+
+
+def _get_seller(request: Request, *, required_scope: str | None = None):
     """Get seller from session or validate API key.
 
     Returns (seller, error_response) tuple.
@@ -37,6 +45,11 @@ def _get_seller(request: Request):
     if auth_header.startswith("Bearer "):
         client = authenticate_api_key(auth_header)
         if client is not None:
+            if required_scope and not has_scope(client, required_scope):
+                return None, Response(
+                    {"error": {"code": "insufficient_scope", "message": "A chave não possui permissão para esta operação."}},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             # API key auth — seller_id must be provided in query or body
             seller_id = request.query_params.get("seller_id") or request.data.get("seller_id")
             if seller_id:
@@ -70,7 +83,7 @@ def create_payment_link_view(request: Request) -> Response:
     Requires Idempotency-Key header.
     Rate limit: 30 requests per minute.
     """
-    seller, error = _get_seller(request)
+    seller, error = _get_seller(request, required_scope="payment_links:write")
     if error:
         return error
 
@@ -86,6 +99,11 @@ def create_payment_link_view(request: Request) -> Response:
             {"error": {"code": "missing_idempotency_key", "message": "Header Idempotency-Key é obrigatório."}},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    if len(idempotency_key) > 100:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Idempotency-Key deve ter no máximo 100 caracteres."}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Parse request body
     data = request.data
@@ -95,6 +113,11 @@ def create_payment_link_view(request: Request) -> Response:
     if not reference:
         return Response(
             {"error": {"code": "validation_error", "message": "Referência é obrigatória.", "field_errors": {"reference": ["Campo obrigatório."]}}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if len(reference) > 80:
+        return Response(
+            {"error": {"code": "validation_error", "message": "Referência deve ter no máximo 80 caracteres."}},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -123,6 +146,13 @@ def create_payment_link_view(request: Request) -> Response:
     customer_name = data.get("customer_name") or None
     customer_phone = data.get("customer_phone") or None
     description = data.get("description") or None
+    field_limits = (("customer_name", customer_name, 120), ("customer_phone", customer_phone, 20), ("description", description, 255))
+    for field, value, max_length in field_limits:
+        if value is not None and (not isinstance(value, str) or len(value) > max_length):
+            return Response(
+                {"error": {"code": "validation_error", "message": f"{field} deve ser texto com no máximo {max_length} caracteres."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
     expires_in_minutes = data.get("expires_in_minutes")
 
     if expires_in_minutes is not None:
@@ -202,14 +232,18 @@ def list_payment_links_view(request: Request) -> Response:
         limit: number of items (default 20, max 100)
         seller_id: required for API key auth
     """
-    seller, error = _get_seller(request)
+    seller, error = _get_seller(request, required_scope="payment_links:read")
     if error:
         return error
 
     # Parse filters
     status_filter = request.query_params.get("status", "")
     cursor = request.query_params.get("cursor", "")
-    limit = min(int(request.query_params.get("limit", 20)), 100)
+    try:
+        limit = int(request.query_params.get("limit", 20))
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 100))
 
     # Build query
     links = PaymentLink.objects.filter(seller=seller)
@@ -258,7 +292,7 @@ def list_payment_links_view(request: Request) -> Response:
 @permission_classes([AllowAny])
 def get_payment_link_view(request: Request, link_id: str) -> Response:
     """Get payment link details with attempts and timeline."""
-    seller, error = _get_seller(request)
+    seller, error = _get_seller(request, required_scope="payment_links:read")
     if error:
         return error
 
@@ -292,7 +326,6 @@ def get_payment_link_view(request: Request, link_id: str) -> Response:
     timeline = _build_timeline(link, attempts)
 
     # Get WhatsApp messages for this link
-    from apps.notifications.models import WhatsAppMessage
 
     whatsapp_messages = link.whatsapp_messages.order_by("created_at")
     whatsapp_data = [
@@ -338,7 +371,7 @@ def get_payment_link_view(request: Request, link_id: str) -> Response:
 @permission_classes([AllowAny])
 def resend_payment_link_view(request: Request, link_id: str) -> Response:
     """Resend payment link via WhatsApp."""
-    seller, error = _get_seller(request)
+    seller, error = _get_seller(request, required_scope="notifications:write")
     if error:
         return error
 

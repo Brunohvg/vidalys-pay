@@ -149,9 +149,18 @@
 
     async function disable() {
         setState('loading');
-        var json = subscription.toJSON();
-        await api('DELETE', {endpoint: json.endpoint});
-        await subscription.unsubscribe();
+        var currentSubscription = subscription;
+        var endpoint = currentSubscription && currentSubscription.endpoint;
+        if (!endpoint) {
+            var registration = await navigator.serviceWorker.ready;
+            currentSubscription = await registration.pushManager.getSubscription();
+            endpoint = currentSubscription && currentSubscription.endpoint;
+        }
+        if (endpoint) await api('DELETE', {endpoint: endpoint});
+        if (currentSubscription) {
+            try { await currentSubscription.unsubscribe(); }
+            catch (_) { /* The server is already disabled; stale browser state is harmless. */ }
+        }
         subscription = null;
         saveOnboarding('snoozed', Date.now() + SNOOZE_DAYS * 24 * 60 * 60 * 1000);
         setState('disabled');
@@ -188,7 +197,7 @@
         }
         if (button) button.addEventListener('click', async function () {
             try { if (subscription) await disable(); else await enable(); }
-            catch (error) { setState('disabled'); showToast(error.message, 'error'); }
+            catch (error) { setState(subscription ? 'enabled' : 'disabled'); showToast(error.message, 'error'); }
         });
     }
 

@@ -21,7 +21,7 @@ class FreightConnectionError(FreightError):
     """Network error connecting to Correios API."""
 
 
-class FreightProviderUnavailable(FreightError):
+class FreightProviderUnavailable(FreightError):  # noqa: N818 - public domain name
     """Correios API returned an unexpected HTTP error or is unavailable."""
 
 

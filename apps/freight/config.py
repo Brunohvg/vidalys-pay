@@ -10,8 +10,9 @@ Only 6 environment variables are required:
 
 All other behaviours (timeouts, product codes, limits) are internal constants.
 """
-import re
 import logging
+import os
+import re
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -90,8 +91,8 @@ class CorreiosConfig:
 def get_correios_config() -> CorreiosConfig:
     """Build validated CorreiosConfig from Django settings.
 
-    Only 6 env vars are consumed.  Old variables (CORREIOS_DR,
-    CORREIOS_ENABLED, CORREIOS_PAC_PRODUCT_CODE, etc) are ignored
+    Only 6 env vars are consumed. Old variables (CORREIOS_DR,
+    CORREIOS_ENABLED, CORREIOS_PAC_PRODUCT_CODE, etc.) are ignored
     with a single warning.
     """
     _warn_legacy_vars()
@@ -181,7 +182,7 @@ def _warn_legacy_vars() -> None:
     global _legacy_warned
     if _legacy_warned:
         return
-    found = [v for v in _LEGACY_VARS if getattr(settings, v, None)]
+    found = [v for v in _LEGACY_VARS if os.environ.get(v)]
     if found:
         logger.warning(
             "Variáveis antigas dos Correios detectadas e ignoradas: %s",

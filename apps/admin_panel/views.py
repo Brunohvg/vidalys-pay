@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
@@ -8,17 +9,20 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.core.rate_limit import rate_limit
+from apps.freight.services import format_price_cents
 from apps.notifications.whatsapp_service import (
     queue_invitation,
     queue_payment_link_created,
 )
 from apps.payment_links.use_cases import create_payment_link
-from apps.freight.services import format_price_cents
 from apps.sellers.models import Seller, SellerInvitation
 from apps.sellers.services import generate_invitation
 
@@ -28,6 +32,7 @@ admin_required = user_passes_test(lambda u: u.is_superuser, login_url="admin_pan
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 
+@rate_limit(max_requests=30, window_seconds=300)
 def panel_login(request):
     if request.user.is_authenticated and request.user.is_superuser:
         return redirect("admin_panel:dashboard")
@@ -43,7 +48,11 @@ def panel_login(request):
         if user is not None and user.is_superuser:
             login(request, user)
             next_url = request.GET.get("next", "")
-            if next_url:
+            if next_url and url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
                 return redirect(next_url)
             return redirect("admin_panel:dashboard")
 
@@ -186,9 +195,15 @@ def create_seller(request):
         })
 
     try:
-        max_amount_cents = int(float(max_amount) * 100) if max_amount else 50000
-    except (ValueError, TypeError):
-        max_amount_cents = 50000
+        max_amount_cents = int(Decimal(max_amount.replace(",", ".")) * 100) if max_amount else 50000
+    except (InvalidOperation, ValueError, TypeError):
+        max_amount_cents = 0
+    if max_amount_cents <= 0:
+        return render(request, "panel/sellers/create.html", {
+            "active_page": "create_seller",
+            "error": "Informe um limite por link maior que zero.",
+            "form_data": {"name": name, "phone": whatsapp, "max_amount": max_amount},
+        })
 
     with transaction.atomic():
         seller = Seller.objects.create(
@@ -253,7 +268,14 @@ def revoke_invitation(request, seller_id):
 def delete_seller(request, seller_id):
     seller = get_object_or_404(Seller, id=seller_id)
     name = seller.name
-    seller.delete()
+    try:
+        seller.delete()
+    except ProtectedError:
+        messages.error(
+            request,
+            f"Não é possível excluir '{name}' porque existem links ou registros associados. Desative o vendedor.",
+        )
+        return redirect("admin_panel:seller_list")
     messages.success(request, f"Vendedor '{name}' excluído permanentemente.")
     return redirect("admin_panel:seller_list")
 
@@ -318,17 +340,27 @@ def _handle_standalone_create_link_post(request, context):
     customer_phone = request.POST.get("customer_phone", "").strip() or None
 
     try:
-        clean = amount_display.replace(".", "").replace(",", ".")
-        amount_cents = int(float(clean) * 100)
+        installments_value = int(installments)
     except (ValueError, TypeError):
-        context["error"] = "Informe um valor válido."
-        context["form_data"] = {"amount_display": amount_display, "installments": int(installments), "customer_name": customer_name, "customer_phone": customer_phone}
-        return render(request, "panel/payment_links/create_standalone.html", context)
+        installments_value = 1
 
     try:
-        installments = int(installments)
-    except (ValueError, TypeError):
-        installments = 1
+        clean = amount_display.replace(".", "").replace(",", ".")
+        amount_cents = int(Decimal(clean) * 100)
+    except (InvalidOperation, ValueError, TypeError):
+        context["error"] = "Informe um valor válido."
+        context["form_data"] = {"amount_display": amount_display, "installments": installments_value, "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
+
+    installments = installments_value
+    if amount_cents <= 0:
+        context["error"] = "O valor deve ser maior que zero."
+        context["form_data"] = {"amount_display": amount_display, "installments": installments, "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
+    if installments not in (1, 2, 3):
+        context["error"] = "Parcelamento deve ser 1x, 2x ou 3x."
+        context["form_data"] = {"amount_display": amount_display, "installments": 1, "customer_name": customer_name, "customer_phone": customer_phone}
+        return render(request, "panel/payment_links/create_standalone.html", context)
 
     if amount_cents > seller.max_payment_amount_cents:
         context["error"] = f"O valor excede o limite do vendedor ({format_price_cents(seller.max_payment_amount_cents)})."

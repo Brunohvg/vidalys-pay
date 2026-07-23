@@ -93,7 +93,7 @@ def normalize_pagarme_api_key(value: str) -> str:
 def build_basic_auth_header(secret_key: str) -> str:
     """Build the Basic Auth header from a raw Secret Key."""
     encoded = base64.b64encode(
-        f"{secret_key}:".encode("utf-8")
+        f"{secret_key}:".encode()
     ).decode("ascii")
     return f"Basic {encoded}"
 

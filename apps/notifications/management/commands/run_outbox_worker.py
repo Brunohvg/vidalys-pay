@@ -4,6 +4,7 @@ Uses SELECT ... FOR UPDATE SKIP LOCKED for safe concurrent processing.
 """
 import logging
 import time
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -20,36 +21,46 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         logger.info("Outbox worker iniciado")
+        self._recover_stale_items()
         while True:
             processed = self._process_batch()
             if not processed:
                 time.sleep(settings.WORKER_POLL_SECONDS)
 
+    def _recover_stale_items(self):
+        from apps.notifications.models import NotificationOutbox
+
+        cutoff = timezone.now() - timedelta(seconds=settings.OUTBOX_STALE_LOCK_SECONDS)
+        recovered = NotificationOutbox.objects.filter(
+            status="PROCESSING",
+            locked_at__lt=cutoff,
+        ).update(status="PENDING", locked_at=None, locked_by="", available_at=timezone.now())
+        if recovered:
+            logger.warning("Outbox: %d itens PROCESSING obsoletos recuperados", recovered)
+
     def _process_batch(self):
         from apps.notifications.models import NotificationOutbox
 
         now = timezone.now()
-        processed = False
-
         with transaction.atomic():
             items = list(
                 NotificationOutbox.objects.select_for_update(skip_locked=True)
                 .filter(status="PENDING", available_at__lte=now)
                 .order_by("available_at")[:10]
             )
-
             for item in items:
-                self._process_item(item)
-                processed = True
+                item.status = "PROCESSING"
+                item.locked_by = "worker"
+                item.locked_at = now
+                item.save(update_fields=["status", "locked_by", "locked_at"])
 
-        return processed
+        # Network I/O must happen after releasing the database row locks.
+        for item in items:
+            self._process_item(item)
+
+        return bool(items)
 
     def _process_item(self, item):
-        item.status = "PROCESSING"
-        item.locked_by = "worker"
-        item.locked_at = timezone.now()
-        item.save(update_fields=["status", "locked_by", "locked_at"])
-
         try:
             success = self._dispatch(item)
             if success:
@@ -71,8 +82,9 @@ class Command(BaseCommand):
             from apps.notifications.push_service import send_push_outbox_item
 
             return send_push_outbox_item(item)
-        logger.warning("TÃ³pico desconhecido: %s", item.topic)
-        return True
+        item.last_error = f"Tópico desconhecido: {item.topic}"[:255]
+        logger.error("Tópico desconhecido: %s", item.topic)
+        return False
 
     def _send_whatsapp(self, item):
         """Send WhatsApp message via Evolution API."""

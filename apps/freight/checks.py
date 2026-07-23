@@ -1,5 +1,6 @@
 """Django system checks for freight configuration."""
-from django.core.checks import CheckMessage, Warning, register
+from django.core.checks import CheckMessage, register
+from django.core.checks import Warning as CheckWarning
 
 from .config import get_correios_config, is_correios_configured
 
@@ -20,7 +21,7 @@ def check_freight_config(app_configs, **kwargs) -> list[CheckMessage]:
 
     if not config.usuario:
         messages.append(
-            Warning(
+            CheckWarning(
                 "CORREIOS_USUARIO nao esta configurado.",
                 hint=hint,
                 id="freight.W001",
@@ -29,7 +30,7 @@ def check_freight_config(app_configs, **kwargs) -> list[CheckMessage]:
 
     if not config.codigo_acesso:
         messages.append(
-            Warning(
+            CheckWarning(
                 "CORREIOS_CODIGO_ACESSO nao esta configurado.",
                 hint=hint,
                 id="freight.W002",
@@ -38,7 +39,7 @@ def check_freight_config(app_configs, **kwargs) -> list[CheckMessage]:
 
     if not config.cep_origem or len(config.cep_origem) != 8:
         messages.append(
-            Warning(
+            CheckWarning(
                 "CORREIOS_CEP_ORIGEM invalido. Precisa ter exatamente 8 digitos.",
                 hint=hint,
                 id="freight.W003",

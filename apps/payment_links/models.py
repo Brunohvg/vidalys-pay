@@ -32,7 +32,7 @@ class PaymentLink(UUIDModel, TimeStampedModel):
         db_index=True,
     )
     provider = models.CharField(max_length=30, default="pagarme")
-    provider_link_id = models.CharField(max_length=100, blank=True, default="", unique=True, null=True)
+    provider_link_id = models.CharField(max_length=100, blank=True, default=None, unique=True, null=True)
     payment_url = models.TextField(blank=True, default="")
     provider_status = models.CharField(max_length=80, blank=True, default="")
     expires_at = models.DateTimeField(null=True, blank=True)

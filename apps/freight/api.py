@@ -115,6 +115,11 @@ def calculate_freight_view(request: Request) -> Response:
             height_cm=height_cm,
             declared_value_cents=int(declared_value_cents),
         )
+    except (TypeError, ValueError):
+        return Response(
+            {"error": {"code": "validation_error", "message": "Peso e valor declarado devem ser números inteiros."}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except FreightValidationError as e:
         return Response(
             {

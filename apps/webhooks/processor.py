@@ -2,6 +2,7 @@
 import logging
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from apps.notifications.push_service import queue_payment_status_push
@@ -27,6 +28,7 @@ def process_webhook_event(event: WebhookEvent) -> bool:
 
     Called via transaction.on_commit â€” the event is already persisted.
     """
+    WebhookEvent.objects.filter(pk=event.pk).update(attempts=F("attempts") + 1)
     config = get_event_config(event.event_type)
 
     if config is None:
@@ -96,6 +98,7 @@ def process_webhook_event(event: WebhookEvent) -> bool:
         event.error_code = "PROCESSING_ERROR"
         event.error_detail = ""
         event.save(update_fields=["processing_status", "error_code", "error_detail"])
+        return False
 
 
 def _handle_mark_paid(event, payment_link, config, normalized):
@@ -253,13 +256,6 @@ def _find_payment_link(event: WebhookEvent, normalized) -> PaymentLink | None:
         except (PaymentLink.DoesNotExist, ValueError):
             pass
 
-    if normalized.order_code:
-        link = PaymentLink.objects.filter(
-            reference=normalized.order_code, provider="pagarme",
-        ).first()
-        if link:
-            return link
-
     if normalized.payment_link_id:
         link = PaymentLink.objects.filter(provider_link_id=normalized.payment_link_id).first()
         if link:
@@ -274,6 +270,19 @@ def _find_payment_link(event: WebhookEvent, normalized) -> PaymentLink | None:
         link = PaymentLink.objects.filter(provider_link_id=normalized.order_id).first()
         if link:
             return link
+
+    if normalized.order_code:
+        candidates = list(
+            PaymentLink.objects.filter(reference=normalized.order_code, provider="pagarme")[:2]
+        )
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(candidates) > 1:
+            logger.error(
+                "Referência ambígua no webhook: event=%s reference=%s",
+                event.id,
+                normalized.order_code,
+            )
 
     return None
 

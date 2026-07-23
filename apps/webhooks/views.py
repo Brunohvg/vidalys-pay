@@ -5,7 +5,7 @@ import json
 import logging
 
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -61,23 +61,32 @@ def pagarme_webhook(request):
     }
 
     try:
-        event = WebhookEvent.objects.create(
-            provider="pagarme",
-            provider_event_id=event_id or None,
-            event_type=event_type,
-            payload=payload,
-            payload_sha256=payload_sha256,
-            headers_summary=headers_summary,
-            authenticity_status="VERIFIED",
-            processing_status=ProcessingStatus.RECEIVED,
-        )
+        with transaction.atomic():
+            event = WebhookEvent.objects.create(
+                provider="pagarme",
+                provider_event_id=event_id or None,
+                event_type=event_type,
+                payload=payload,
+                payload_sha256=payload_sha256,
+                headers_summary=headers_summary,
+                authenticity_status="VERIFIED",
+                processing_status=ProcessingStatus.RECEIVED,
+            )
     except IntegrityError:
         logger.info("Evento duplicado: id=%s type=%s", event_id, event_type)
-        return JsonResponse({"received": True, "event_id": event_id, "duplicate": True})
+        existing = WebhookEvent.objects.filter(provider_event_id=event_id).first() if event_id else None
+        reprocessed = False
+        if existing and existing.processing_status == ProcessingStatus.FAILED:
+            reprocessed = bool(process_webhook_event(existing))
+        return JsonResponse({
+            "received": True,
+            "event_id": event_id,
+            "duplicate": True,
+            "reprocessed": reprocessed,
+        })
 
     logger.info("Webhook persistido: id=%s type=%s", event_id, event_type)
 
-    from django.db import transaction
     transaction.on_commit(lambda: process_webhook_event(event))
 
     return JsonResponse({"received": True, "event_id": event_id, "duplicate": False})

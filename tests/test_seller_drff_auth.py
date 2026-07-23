@@ -85,7 +85,7 @@ class TestSellerSessionAuthentication:
         with pytest.raises(AuthenticationFailed) as exc_info:
             auth.authenticate(FakeRequest(inactive_seller))
 
-        assert "seller_not_authenticated" in str(exc_info.value.detail)
+        assert exc_info.value.get_codes() == "seller_not_authenticated"
 
     def test_authenticate_header(self):
         auth = SellerSessionAuthentication()
@@ -188,25 +188,29 @@ class TestFreightCalculationAuth:
         _activate_seller(client, seller)
 
         with patch("apps.freight.api.calculate_freight") as mock_calc:
-            from apps.freight.services import FreightOption
-
             mock_calc.return_value = [
-                FreightOption(
-                    service_code="03298",
-                    service_name="PAC",
-                    price_cents=1500,
-                    delivery_days=10,
-                    official=True,
-                    error=None,
-                )
+                {
+                    "service_code": "03298",
+                    "service_name": "PAC",
+                    "price_cents": 1500,
+                    "provider_delivery_days": 10,
+                    "additional_delivery_days": 0,
+                    "official": True,
+                    "provider": "correios",
+                    "error": None,
+                }
             ]
 
             with patch("apps.freight.api.lookup_cep") as mock_cep:
-                mock_cep.return_value = {
-                    "zip_code": "30130000",
-                    "city": "Belo Horizonte",
-                    "state": "MG",
-                }
+                from apps.freight.dataclasses import CEPAddressData
+
+                mock_cep.return_value = CEPAddressData(
+                    zip_code="30130000",
+                    street="",
+                    neighborhood="",
+                    city="Belo Horizonte",
+                    state="MG",
+                )
 
                 response = client.post(
                     reverse("freight:calculate_freight"),

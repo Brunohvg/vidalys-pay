@@ -1,7 +1,7 @@
 """Freight calculation business logic."""
 import logging
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 import httpx
 from django.core.cache import cache
