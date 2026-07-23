@@ -21,7 +21,7 @@ Authorization: Bearer vly_live_xxxxx
 ### Webhook Pagar.me
 
 ```http
-Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:)
+Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD)
 ```
 
 ## Endpoints
@@ -230,11 +230,16 @@ Idempotency-Key: 9c38991e-8bf4-4d19-89bc-f91f22bfef16
 
 **POST** `/api/v1/webhooks/pagarme/`
 
+Recebe eventos de links e boletos. Eventos autenticados sem correlação com
+recursos da Vidalys Pay respondem `200`, mas são descartados e não permanecem
+em `WebhookEvent`. Eventos próprios processados, ignorados ou falhos permanecem
+para auditoria. Detalhes: [`WEBHOOKS.md`](WEBHOOKS.md).
+
 #### Headers
 
 ```http
 Content-Type: application/json
-Authorization: Basic base64(SECRET:)
+Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD)
 ```
 
 #### Body (Evento order.paid)
@@ -264,6 +269,9 @@ Authorization: Basic base64(SECRET:)
   "duplicate": false
 }
 ```
+
+`duplicate` só será `true` quando a primeira entrega tiver sido retida. Um
+evento externo descartado será avaliado e descartado novamente se for reenviado.
 
 ### Health Check
 

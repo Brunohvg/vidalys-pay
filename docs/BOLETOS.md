@@ -47,12 +47,17 @@ reconciliação operacional.
 ## Webhook e reconciliação
 
 Não existe endpoint separado para boletos. O endpoint Pagar.me existente
-persiste o evento bruto, valida Basic Auth e deduplica por `provider_event_id`.
+valida Basic Auth e deduplica eventos próprios por `provider_event_id`. Eventos
+sem correlação com boleto, link ou referência interna são descartados e não
+permanecem no banco.
 O roteamento identifica o boleto nesta ordem:
 
 1. `metadata.internal_boleto_id`;
 2. `provider_charge_id`;
 3. `provider_order_id`.
+
+A política completa de retenção e os logs de diagnóstico estão em
+[`WEBHOOKS.md`](WEBHOOKS.md).
 
 Eventos duplicados não alteram nem notificam novamente. Eventos fora de ordem
 passam pela tabela de transições e não regridem estados finais. Eventos que
@@ -128,6 +133,10 @@ Em produção, `CNPJ_LOOKUP_BASE_URL` e `APP_BASE_URL` devem usar HTTPS.
 2. Confira `internal_boleto_id`, order e charge no payload técnico.
 3. Corrija apenas a causa da correlação.
 4. Use a ação **Reprocessar evento selecionado**.
+
+Se não houver metadado interno nem identificador pertencente à Vidalys Pay, o
+evento será descartado. Nesse caso, procure `Webhook externo descartado` nos
+logs do serviço `web`; não haverá registro no Admin.
 
 ### Notificação não entregue
 

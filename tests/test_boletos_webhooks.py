@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.boletos.services.webhook_processing import ALLOWED_TRANSITIONS
 from apps.notifications.models import NotificationOutbox, WhatsAppMessage
+from apps.payment_links.models import PaymentLink, PaymentLinkStatus
 from apps.sellers.models import Seller
 from apps.webhooks.models import ProcessingStatus, WebhookEvent
 from apps.webhooks.pagarme_payload import normalize_event
@@ -331,6 +332,70 @@ def test_explicit_missing_boleto_remains_reprocessable():
 
 
 @pytest.mark.django_db
+def test_uncorrelated_provider_event_is_discarded():
+    payload = {
+        "id": "hook_external_order",
+        "type": "order.paid",
+        "data": {"id": "or_external", "status": "paid"},
+    }
+    event = _event(payload)
+    event_pk = event.pk
+
+    assert process_webhook_event(event)
+
+    assert not WebhookEvent.objects.filter(pk=event_pk).exists()
+
+
+@pytest.mark.django_db
+def test_unknown_event_for_owned_payment_link_is_retained():
+    seller = Seller.objects.create(
+        name="Vendedor Link",
+        whatsapp_phone="+5511988887777",
+        max_payment_amount_cents=1_000_000,
+    )
+    payment_link = PaymentLink.objects.create(
+        seller=seller,
+        reference="LINK-WEBHOOK-1",
+        amount_cents=15_000,
+        installments=1,
+        status=PaymentLinkStatus.ACTIVE,
+        idempotency_key="owned-unknown-webhook",
+    )
+    payload = {
+        "id": "hook_owned_unknown",
+        "type": "order.future_status",
+        "data": {
+            "id": "or_owned_unknown",
+            "metadata": {"internal_payment_link_id": str(payment_link.id)},
+        },
+    }
+    event = _event(payload)
+
+    assert process_webhook_event(event)
+
+    event.refresh_from_db()
+    assert event.processing_status == ProcessingStatus.IGNORED
+
+
+@pytest.mark.django_db
+def test_missing_internal_payment_link_reference_is_retained_for_audit():
+    payload = {
+        "id": "hook_missing_payment_link",
+        "type": "order.paid",
+        "data": {
+            "id": "or_missing_payment_link",
+            "metadata": {"internal_payment_link_id": str(uuid4())},
+        },
+    }
+    event = _event(payload)
+
+    assert process_webhook_event(event)
+
+    event.refresh_from_db()
+    assert event.processing_status == ProcessingStatus.IGNORED
+
+
+@pytest.mark.django_db
 def test_endpoint_authentication_and_duplicate_delivery(settings, client, boleto):
     settings.PAGARME_WEBHOOK_AUTH_MODE = "basic"
     settings.PAGARME_WEBHOOK_BASIC_AUTH_USER = "pagarme"
@@ -361,6 +426,36 @@ def test_endpoint_authentication_and_duplicate_delivery(settings, client, boleto
     assert duplicate.status_code == 200
     assert duplicate.json()["duplicate"] is True
     assert WebhookEvent.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_endpoint_accepts_but_does_not_retain_uncorrelated_event(settings, client):
+    settings.PAGARME_WEBHOOK_AUTH_MODE = "basic"
+    settings.PAGARME_WEBHOOK_BASIC_AUTH_USER = "pagarme"
+    settings.PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD = "secret"
+    payload = {
+        "id": "hook_external_endpoint",
+        "type": "order.paid",
+        "data": {"id": "or_external_endpoint", "status": "paid"},
+    }
+    credentials = base64.b64encode(b"pagarme:secret").decode()
+
+    response = client.post(
+        reverse("webhooks:pagarme_webhook"),
+        data=json.dumps(payload),
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Basic {credentials}",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "received": True,
+        "event_id": "hook_external_endpoint",
+        "duplicate": False,
+    }
+    assert not WebhookEvent.objects.filter(
+        provider_event_id="hook_external_endpoint"
+    ).exists()
 
 
 def test_normalizer_tolerates_malformed_nested_provider_data():

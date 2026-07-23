@@ -23,7 +23,8 @@ MAX_BODY_SIZE = getattr(settings, "PAGARME_WEBHOOK_MAX_BODY_BYTES", 1_048_576)
 def pagarme_webhook(request):
     """Receive Pagar.me webhook events.
 
-    Persists the event immediately, then processes asynchronously via on_commit.
+    Persists the event, then processes it after the insert transaction commits.
+    Uncorrelated provider events are removed by the processor.
     """
     content_type = request.content_type or ""
     if "application/json" not in content_type:

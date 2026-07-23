@@ -51,9 +51,16 @@ pytest --cov=apps --cov-report=html
 # Testes específicos
 pytest tests/test_sellers_services.py -v
 
+# Correlação, retenção e reconciliação de webhooks
+pytest tests/test_boletos_webhooks.py -v
+
 # Apenas testes marcados
 pytest -m "integration"
 ```
+
+Os testes de webhook garantem que eventos externos sem correlação sejam
+excluídos, enquanto eventos próprios ignorados ou com referência interna
+ausente permaneçam disponíveis para diagnóstico.
 
 ## Estrutura de Testes
 

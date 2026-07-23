@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.notifications.models import WhatsAppMessage
-from apps.sellers.models import Selle
+from apps.sellers.models import Seller
 from apps.webhooks.models import WebhookEvent
 
 

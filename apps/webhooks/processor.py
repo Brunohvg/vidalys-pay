@@ -52,36 +52,32 @@ def process_webhook_event(event: WebhookEvent) -> bool:
             event.save(update_fields=["processing_status", "error_code", "error_detail"])
             return False
 
+    payment_link = _find_payment_link(event, normalized)
+    has_internal_link_reference = bool(normalized.internal_payment_link_id)
     config = get_event_config(event.event_type)
 
     if config is None:
-        logger.info("Evento desconhecido: %s â€” IGNORED", event.event_type)
-        event.processing_status = ProcessingStatus.IGNORED
-        event.processed_at = timezone.now()
-        event.save(update_fields=["processing_status", "processed_at"])
-        return True
+        return _ignore_or_discard(
+            event,
+            correlated=payment_link is not None or has_internal_link_reference,
+            reason="unknown_event_type",
+        )
 
     action = config.get("action", "ignore")
 
     if action == "ignore":
-        event.processing_status = ProcessingStatus.IGNORED
-        event.processed_at = timezone.now()
-        event.save(update_fields=["processing_status", "processed_at"])
-        return True
-
-    payment_link = _find_payment_link(event, normalized)
+        return _ignore_or_discard(
+            event,
+            correlated=payment_link is not None or has_internal_link_reference,
+            reason="configured_ignore",
+        )
 
     if payment_link is None:
-        logger.info(
-            "Link nÃ£o encontrado para evento %s; order=%s charge=%s",
-            event.event_type,
-            normalized.order_code,
-            normalized.charge_id,
+        return _ignore_or_discard(
+            event,
+            correlated=has_internal_link_reference,
+            reason="payment_link_not_found",
         )
-        event.processing_status = ProcessingStatus.IGNORED
-        event.processed_at = timezone.now()
-        event.save(update_fields=["processing_status", "processed_at"])
-        return True
 
     # Guard: never regress final states
     current_status = payment_link.status
@@ -121,6 +117,37 @@ def process_webhook_event(event: WebhookEvent) -> bool:
         event.error_detail = ""
         event.save(update_fields=["processing_status", "error_code", "error_detail"])
         return False
+
+
+def _ignore_or_discard(
+    event: WebhookEvent,
+    *,
+    correlated: bool,
+    reason: str,
+) -> bool:
+    """Retain owned ignored events and discard events unrelated to Vidalys Pay."""
+    if correlated:
+        logger.info(
+            "Webhook correlacionado ignorado: id=%s type=%s reason=%s",
+            event.provider_event_id,
+            event.event_type,
+            reason,
+        )
+        event.processing_status = ProcessingStatus.IGNORED
+        event.processed_at = timezone.now()
+        event.save(update_fields=["processing_status", "processed_at"])
+        return True
+
+    provider_event_id = event.provider_event_id
+    event_type = event.event_type
+    event.delete()
+    logger.info(
+        "Webhook externo descartado: id=%s type=%s reason=%s",
+        provider_event_id,
+        event_type,
+        reason,
+    )
+    return True
 
 
 def _handle_mark_paid(event, payment_link, config, normalized):

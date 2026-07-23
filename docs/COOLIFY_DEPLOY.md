@@ -35,7 +35,9 @@ Copie e cole cada variável no painel do Coolify.
 |----------|-------|
 | `PAGARME_BASE_URL` | `https://api.pagar.me/core/v5` |
 | `PAGARME_SECRET_KEY` | `sk_test_xxx` (sua chave) |
+| `PAGARME_WEBHOOK_AUTH_MODE` | `basic` |
 | `PAGARME_WEBHOOK_BASIC_AUTH_USER` | `[GERE_UMA_CHAVE_FORTE]` |
+| `PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD` | `[GERE_OUTRA_CHAVE_FORTE]` |
 
 ### Grupo 4: Evolution API
 

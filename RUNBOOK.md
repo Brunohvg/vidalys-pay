@@ -137,12 +137,18 @@ docker compose logs web --tail=50
 **Verificar:**
 1. `SELECT * FROM webhooks_webhookevent ORDER BY received_at DESC LIMIT 10`
 2. Campo `authenticity_status` e `processing_status`
-3. Logs do worker
+3. Logs do serviço `web`
+4. Mensagens `Webhook correlacionado ignorado` e `Erro ao processar evento`
 
 **Solução:** Reprocessar pelo admin → Webhooks → Selecionar → Reprocessar evento.
 
 Para boletos em `CREATION_UNKNOWN`, eventos com `BOLETO_NOT_FOUND` e histórico
 de notificações, consulte o procedimento detalhado em `docs/BOLETOS.md`.
+
+Se o evento não estiver no banco, procure `Webhook externo descartado` nos logs.
+Isso indica que não havia boleto, link nem referência interna da Vidalys Pay e,
+portanto, o evento foi removido intencionalmente. A política e o roteiro de teste
+estão em `docs/WEBHOOKS.md`.
 
 ### Erro de migrations
 

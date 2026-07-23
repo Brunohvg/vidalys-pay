@@ -50,6 +50,8 @@ Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASI
 
 - Username: segredo configurado no painel Pagar.me
 - Password: segredo forte e independente
+- Eventos autenticados sem correlação são descartados sem copiar o payload para
+  logs; eventos próprios permanecem para auditoria.
 
 ## Autorização
 
@@ -185,6 +187,10 @@ existing = WebhookEvent.objects.filter(
 if existing:
     return JsonResponse({"duplicate": True})
 ```
+
+A deduplicação persistente se aplica aos eventos correlacionados. Eventos
+externos sem vínculo são excluídos e, em caso de reenvio, passam novamente pela
+autenticação e pelo descarte. Veja [`WEBHOOKS.md`](WEBHOOKS.md).
 
 ### Validação de Payload
 

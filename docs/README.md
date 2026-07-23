@@ -4,6 +4,14 @@
 
 O **Vidalys Pay** é uma aplicação interna da Vidalys para criação de links de pagamento. O sistema permite que vendedores criem links de pagamento via API do Pagar.me, recebam os links no WhatsApp via Evolution API e acompanhem os pagamentos por webhooks.
 
+Documentos operacionais principais:
+
+- [`API.md`](API.md): contratos HTTP;
+- [`BOLETOS.md`](BOLETOS.md): emissão e reconciliação de boletos;
+- [`WEBHOOKS.md`](WEBHOOKS.md): autenticação, correlação, retenção e diagnóstico;
+- [`DEPLOYMENT.md`](DEPLOYMENT.md): configuração e publicação;
+- [`TESTING.md`](TESTING.md): validações automatizadas.
+
 ### Objetivo
 
 Resolver os problemas de:
@@ -177,8 +185,11 @@ Authorization: Bearer vly_live_xxxxx
 ### Webhook Pagar.me
 
 ```http
-Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:)
+Authorization: Basic base64(PAGARME_WEBHOOK_BASIC_AUTH_USER:PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD)
 ```
+
+Eventos sem vínculo com boleto, link ou referência interna da Vidalys Pay não
+permanecem armazenados. Consulte [`WEBHOOKS.md`](WEBHOOKS.md).
 
 ## API
 
@@ -318,6 +329,7 @@ ruff check .
 | `DATABASE_URL` | URL do PostgreSQL | Sim |
 | `PAGARME_SECRET_KEY` | Chave Pagar.me | Sim |
 | `PAGARME_WEBHOOK_BASIC_AUTH_USER` | Usuário Basic Auth webhook | Sim |
+| `PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD` | Senha Basic Auth webhook | Sim |
 | `EVOLUTION_API_URL` | URL da Evolution API | Sim |
 | `EVOLUTION_API_KEY` | Chave da Evolution API | Sim |
 | `EVOLUTION_INSTANCE` | Nome da instância | Sim |

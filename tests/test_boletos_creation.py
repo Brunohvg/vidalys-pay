@@ -13,8 +13,8 @@ from apps.boletos.services.boleto_creation import (
     BoletoCreationData,
     create_boleto,
 )
-from apps.integrations.pagarme.client import PagarmeClient, PagarmeErro
-from apps.sellers.models import Selle
+from apps.integrations.pagarme.client import PagarmeClient, PagarmeError
+from apps.sellers.models import Seller
 from apps.webhooks.pagarme_payload import normalize_event
 
 VALID_CNPJ = "11222333000181"
@@ -486,8 +486,8 @@ def test_manager_confirmation_creates_and_redirects(
     boleto = Boleto.objects.get()
     assert response.status_code == 302
     assert response.url == reverse("boletos:manager_detail", kwargs={"boleto_id": boleto.id})
-    assert boleto.created_by_user == manage
-    assert boleto.seller == selle
+    assert boleto.created_by_user == manager
+    assert boleto.seller == seller
 
 
 @pytest.mark.django_db
@@ -509,7 +509,7 @@ def test_seller_creation_page_is_bound_to_authenticated_seller(client, seller):
         response = client.get(reverse("boletos:seller_create"))
 
     assert response.status_code == 200
-    assert response.context["seller"] == selle
+    assert response.context["seller"] == seller
     assert response.context["sellers"] is None
     assert b'class="boleto-cnpj-lookup"' in response.content
     assert b"if(input)input.value=data[key]||''" in response.content

@@ -111,11 +111,15 @@ Módulo reservado para futura implementação de calculadora de frete.
 4. Verificação de duplicidade
 5. Mapeamento do evento
 6. Roteamento para Boleto ou atualização de PaymentLink/PaymentAttempt
-7. Inserção de notificações no outbox
-8. Resposta 200
+7. Descarte quando não existe correlação com nenhum recurso da Vidalys Pay
+8. Retenção dos eventos próprios para auditoria
+9. Inserção de notificações no outbox
+10. Resposta 200
 ```
 
 Detalhes do fluxo de boletos: [`BOLETOS.md`](BOLETOS.md).
+Política completa de correlação, retenção e diagnóstico:
+[`WEBHOOKS.md`](WEBHOOKS.md).
 
 ### Fluxo de Autenticação
 

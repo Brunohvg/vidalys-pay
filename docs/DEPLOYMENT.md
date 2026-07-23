@@ -49,7 +49,9 @@ PAGARME_BASE_URL=https://api.pagar.me/core/v5  # produção
 PAGARME_BASE_URL=https://sdx-api.pagar.me/core/v5  # sandbox
 
 PAGARME_SECRET_KEY=sk_test_xxx  # ou sk_live_xxx
+PAGARME_WEBHOOK_AUTH_MODE=basic
 PAGARME_WEBHOOK_BASIC_AUTH_USER=segredo-do-webhook
+PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD=senha-forte-independente
 ```
 
 ### Evolution API
@@ -205,6 +207,16 @@ docker compose logs -f web
 # Ver logs do worker
 docker compose logs -f worker
 ```
+
+Para verificar a retenção seletiva de webhooks:
+
+```bash
+docker compose logs web | grep "Webhook externo descartado"
+docker compose logs web | grep "Webhook correlacionado ignorado"
+```
+
+Antes de liberar pagamentos reais, execute o roteiro de
+[`WEBHOOKS.md`](WEBHOOKS.md) e o checklist de [`BOLETOS.md`](BOLETOS.md).
 
 ## Rollback
 

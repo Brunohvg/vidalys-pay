@@ -18,6 +18,7 @@ O **Vidalys Pay** é uma aplicação interna para vendedores criarem links de pa
 - Consulta de CNPJ com autopreenchimento e revisão antes da emissão
 - Envio automático via WhatsApp
 - Acompanhamento em tempo real via webhooks
+- Retenção seletiva de webhooks: eventos externos sem vínculo são descartados
 - Histórico de transações
 - Dashboard mobile-first (PWA)
 - API REST para integrações (n8n)
@@ -129,6 +130,15 @@ docker compose up --build
 
 Veja `.env.example` para todas as variáveis.
 
+### Webhooks Pagar.me
+
+Eventos autenticados são correlacionados com boletos e links da Vidalys Pay.
+Eventos próprios permanecem no banco para processamento e auditoria; eventos
+sem boleto, link ou referência interna são descartados e aparecem apenas nos
+logs como `Webhook externo descartado`. Consulte
+[`docs/WEBHOOKS.md`](docs/WEBHOOKS.md) para retenção, diagnóstico e roteiro de
+teste em produção.
+
 ## Estrutura do Projeto
 
 ```
@@ -215,6 +225,7 @@ docker compose exec web python manage.py createsuperuser
 | `APP_BASE_URL` | URL base da aplicação |
 | `PAGARME_SECRET_KEY` | Chave de produção do Pagar.me |
 | `PAGARME_WEBHOOK_BASIC_AUTH_USER` | Segredo Basic Auth para webhooks |
+| `PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD` | Senha forte e independente do webhook |
 | `EVOLUTION_API_URL` | URL da Evolution API |
 | `EVOLUTION_API_KEY` | Chave da Evolution API |
 | `EVOLUTION_INSTANCE` | Nome da instância Evolution |
@@ -262,6 +273,8 @@ curl -s https://pay.vidalys.com.br/health/ready/
 
 Veja `RUNBOOK.md` para procedimentos operacionais.
 O fluxo completo de boletos está documentado em [`docs/BOLETOS.md`](docs/BOLETOS.md).
+O fluxo e a retenção de webhooks estão documentados em
+[`docs/WEBHOOKS.md`](docs/WEBHOOKS.md).
 
 ## Comandos Úteis
 
