@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 
+from apps.boletos.models import Boleto
 from apps.payment_links.models import PaymentLink
 
 from .models import NotificationOutbox, PushSubscription
@@ -17,6 +18,16 @@ EVENT_CONTENT = {
     "payment_expired": ("Link expirado", "O link {reference} expirou."),
     "payment_refunded": ("Pagamento reembolsado", "O pagamento de {amount} do link {reference} foi reembolsado."),
     "payment_chargedback": ("Chargeback recebido", "O pagamento do link {reference} recebeu um chargeback."),
+}
+
+BOLETO_EVENT_CONTENT = {
+    "boleto_created": ("Boleto emitido", "Boleto de {company} emitido no valor de {amount}."),
+    "boleto_paid": ("Boleto pago", "Pagamento de {company} confirmado: {amount}."),
+    "boleto_failed": ("Falha no boleto", "A cobrança de {company} não foi concluída."),
+    "boleto_expired": ("Boleto vencido", "O boleto de {company}, no valor de {amount}, venceu."),
+    "boleto_canceled": ("Boleto cancelado", "O boleto de {company} foi cancelado."),
+    "boleto_partially_canceled": ("Boleto parcialmente cancelado", "O boleto de {company} foi parcialmente cancelado."),
+    "boleto_refunded": ("Boleto estornado", "O pagamento de {company}, no valor de {amount}, foi estornado."),
 }
 
 DELIVERED_SUBSCRIPTIONS_KEY = "_delivered_subscription_ids"
@@ -54,6 +65,81 @@ def queue_payment_status_push(*, payment_link: PaymentLink, event_type: str, ded
         },
     )
     return created
+
+
+def queue_boleto_status_push(*, boleto: Boleto, event_type: str) -> bool:
+    """Queue one idempotent push for a boleto lifecycle event."""
+    content = BOLETO_EVENT_CONTENT.get(event_type)
+    if not content:
+        return False
+    title, body_template = content
+    company = boleto.company_snapshot.get("legal_name") or boleto.company.legal_name
+    return _queue_boleto_push(
+        boleto=boleto,
+        event_type=event_type,
+        title=title,
+        body=body_template.format(company=company, amount=_format_brl(boleto.amount_cents)),
+    )
+
+
+def queue_boleto_reminder_push(*, boleto: Boleto, days_until_due: int) -> bool:
+    """Queue one reminder push for a configured due-date offset."""
+    title, body = _boleto_reminder_content(boleto, days_until_due)
+    return _queue_boleto_push(
+        boleto=boleto,
+        event_type=_reminder_event_type(days_until_due),
+        title=title,
+        body=body,
+    )
+
+
+def _queue_boleto_push(*, boleto: Boleto, event_type: str, title: str, body: str) -> bool:
+    if not (
+        settings.WEBPUSH_VAPID_PUBLIC_KEY and settings.WEBPUSH_VAPID_PRIVATE_KEY
+    ):
+        return False
+    dedup_key = f"webpush:boleto:{boleto.id}:{event_type}"
+    _, created = NotificationOutbox.objects.get_or_create(
+        deduplication_key=dedup_key,
+        defaults={
+            "topic": "webpush.send",
+            "aggregate_type": "boleto",
+            "aggregate_id": boleto.id,
+            "payload": {
+                "seller_id": str(boleto.seller_id),
+                "title": title,
+                "body": body,
+                "event_type": event_type,
+                "url": f"/app/boletos/{boleto.id}/",
+                "tag": f"boleto-{boleto.id}-{event_type}",
+                "badge": "/static/pwa/app-icon-192.png",
+                "icon": "/static/pwa/app-icon-192.png",
+            },
+            "status": "PENDING",
+        },
+    )
+    return created
+
+
+def _boleto_reminder_content(boleto: Boleto, days_until_due: int) -> tuple[str, str]:
+    company = boleto.company_snapshot.get("legal_name") or boleto.company.legal_name
+    amount = _format_brl(boleto.amount_cents)
+    if days_until_due > 0:
+        title = "Boleto próximo do vencimento"
+        timing = f"vence em {days_until_due} dia{'s' if days_until_due != 1 else ''}"
+    elif days_until_due == 0:
+        title = "Boleto vence hoje"
+        timing = "vence hoje"
+    else:
+        title = "Boleto vencido"
+        overdue_days = abs(days_until_due)
+        timing = f"venceu há {overdue_days} dia{'s' if overdue_days != 1 else ''}"
+    return title, f"O boleto de {company}, no valor de {amount}, {timing}."
+
+
+def _reminder_event_type(days_until_due: int) -> str:
+    suffix = f"minus_{abs(days_until_due)}" if days_until_due < 0 else str(days_until_due)
+    return f"boleto_due_{suffix}"
 
 
 def send_push_outbox_item(item) -> bool:

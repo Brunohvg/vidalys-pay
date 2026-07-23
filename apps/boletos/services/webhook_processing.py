@@ -262,7 +262,9 @@ def _finish_event(
 
 
 def _queue_status_notification(boleto_id, event_type: str) -> None:
+    from apps.notifications.push_service import queue_boleto_status_push
     from apps.notifications.whatsapp_service import queue_boleto_status
 
     boleto = Boleto.objects.select_related("seller").get(pk=boleto_id)
     queue_boleto_status(boleto=boleto, event_type=event_type)
+    queue_boleto_status_push(boleto=boleto, event_type=event_type)

@@ -11,6 +11,7 @@ Documentos operacionais principais:
 - [`WEBHOOKS.md`](WEBHOOKS.md): autenticação, correlação, retenção e diagnóstico;
 - [`DEPLOYMENT.md`](DEPLOYMENT.md): configuração e publicação;
 - [`TESTING.md`](TESTING.md): validações automatizadas.
+- [`FUTURE_FEATURES.md`](FUTURE_FEATURES.md): backlog priorizado para as próximas fases.
 
 ### Objetivo
 

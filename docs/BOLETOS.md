@@ -91,7 +91,7 @@ quando order, charge ou última transação indicarem explicitamente pagamento,
 cancelamento, vencimento/expiração ou falha. Um fechamento inconclusivo é
 marcado como `IGNORED`.
 
-## Notificações
+## Notificações e lembretes
 
 As mensagens usam `NotificationOutbox` e o worker existente. Não há chamada
 direta do domínio de boletos à Evolution API. A chave de deduplicação contém
@@ -102,6 +102,20 @@ entrega concluída.
 - Pagamento: vendedor; cliente e gestores conforme configuração.
 - Falha: somente vendedor, sem detalhes técnicos.
 - Cancelamento: vendedor; cliente e gestores conforme configuração.
+- Push: emissão, pagamento, falha, vencimento, cancelamento, cancelamento
+  parcial e estorno. O clique abre o detalhe do boleto do vendedor.
+- Lembretes: por padrão, 3 dias antes, no vencimento e 1 dia depois, somente
+  para boletos `PENDING`. O vendedor recebe push quando VAPID está configurado
+  e WhatsApp quando `BOLETO_REMINDER_WHATSAPP_ENABLED=true`.
+
+O worker executa a varredura periodicamente em
+`BOLETO_REMINDER_TIME_ZONE`. Cada combinação de boleto, marco de vencimento,
+canal e destinatário possui chave de deduplicação permanente. Reiniciar ou
+escalar o worker não reenvia uma notificação já registrada.
+
+Avisos ao cliente por WhatsApp ficam desabilitados por padrão. Só habilite
+`BOLETO_REMINDER_NOTIFY_CUSTOMER` quando houver autorização e política de
+comunicação definida.
 - Vencimento, cancelamento parcial e estorno: vendedor.
 
 Telefones são normalizados para DDI 55. Destinatários sem telefone ou com
@@ -131,6 +145,12 @@ PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD=...
 BOLETO_MANAGER_WHATSAPP_PHONES=5511999999999,5511888888888
 BOLETO_NOTIFY_CUSTOMER_ON_PAID=false
 BOLETO_NOTIFY_CUSTOMER_ON_CANCELED=false
+BOLETO_REMINDERS_ENABLED=true
+BOLETO_REMINDER_DAYS=3,0,-1
+BOLETO_REMINDER_SCAN_SECONDS=3600
+BOLETO_REMINDER_TIME_ZONE=America/Sao_Paulo
+BOLETO_REMINDER_WHATSAPP_ENABLED=true
+BOLETO_REMINDER_NOTIFY_CUSTOMER=false
 ```
 
 Em produção, `CNPJ_LOOKUP_BASE_URL` e `APP_BASE_URL` devem usar HTTPS.
@@ -172,6 +192,11 @@ logs do serviço `web`; não haverá registro no Admin.
 2. Consulte o item `NotificationOutbox` pela chave `boleto:<uuid>:...`.
 3. Verifique o worker e as variáveis `EVOLUTION_*`.
 4. Itens `DEAD` exigem análise da causa antes de novo envio.
+
+Para push, procure por `topic=webpush.send` e chave iniciada por
+`webpush:boleto:`. Para lembretes, filtre `event_type` por `boleto_due_`.
+Confirme também se o dispositivo possui `PushSubscription` ativa e se as duas
+chaves `WEBPUSH_VAPID_*` estão configuradas.
 
 ## Segurança e dados
 

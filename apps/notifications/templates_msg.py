@@ -165,3 +165,26 @@ def boleto_status_message(*, boleto, event_type: str) -> str:
     if event_type == "boleto_paid" and boleto.paid_at:
         lines.append(f"Confirmado em: {boleto.paid_at:%d/%m/%Y %H:%M}")
     return "\n".join(lines)
+
+
+def boleto_reminder_message(*, boleto, days_until_due: int) -> str:
+    """Render a seller/customer-safe due-date reminder."""
+    if days_until_due > 0:
+        timing = f"vence em {days_until_due} dia{'s' if days_until_due != 1 else ''}"
+    elif days_until_due == 0:
+        timing = "vence hoje"
+    else:
+        overdue_days = abs(days_until_due)
+        timing = f"venceu há {overdue_days} dia{'s' if overdue_days != 1 else ''}"
+    lines = [
+        "Lembrete de boleto",
+        "",
+        f"Empresa: {boleto.company_snapshot['legal_name']}",
+        f"Valor: {_brl(boleto.amount_cents)}",
+        f"Vencimento: {boleto.due_date:%d/%m/%Y} ({timing})",
+    ]
+    if boleto.digitable_line:
+        lines.append(f"Linha digitável: {boleto.digitable_line}")
+    if boleto.pdf_url:
+        lines.append(f"PDF: {boleto.pdf_url}")
+    return "\n".join(lines)

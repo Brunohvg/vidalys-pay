@@ -11,6 +11,7 @@ from .models import NotificationOutbox, RecipientType, WhatsAppMessage, WhatsApp
 from .templates_msg import (
     boleto_created_customer_message,
     boleto_created_seller_message,
+    boleto_reminder_message,
     boleto_status_message,
     invitation_message,
     payment_approved_message,
@@ -315,6 +316,9 @@ def _queue_message(
     dedup_key = f"{aggregate_type}:{aggregate_id}:{event_type}:{recipient_type}:{recipient_phone}{suffix}"
 
     with transaction.atomic():
+        # Serialize notification creation per seller so concurrent workers cannot
+        # pass the duplicate check and race on the unique outbox key.
+        Seller.objects.select_for_update().only("id").get(pk=seller.pk)
         existing_query = NotificationOutbox.objects.filter(deduplication_key=dedup_key)
         existing = (
             existing_query.first()
@@ -469,6 +473,55 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
             )
         )
     return deliveries
+
+
+def queue_boleto_reminder(*, boleto, days_until_due: int) -> list[WhatsAppDeliveryResult]:
+    """Queue a permanently deduplicated reminder for configured recipients."""
+    event_type = _boleto_reminder_event_type(days_until_due)
+    text = boleto_reminder_message(boleto=boleto, days_until_due=days_until_due)
+    recipients = [(RecipientType.SELLER, boleto.seller.whatsapp_phone)]
+    if settings.BOLETO_REMINDER_NOTIFY_CUSTOMER:
+        recipients.append((RecipientType.CUSTOMER, _boleto_customer_phone(boleto)))
+
+    deliveries = []
+    for recipient_type, phone in recipients:
+        phone_status, normalized_phone = _phone_status(phone)
+        if phone_status != "queued":
+            deliveries.append(
+                WhatsAppDeliveryResult(
+                    status=phone_status,
+                    recipient_type=recipient_type,
+                    recipient_phone="",
+                )
+            )
+            continue
+        message = _queue_message(
+            seller=boleto.seller,
+            boleto=boleto,
+            template_key=event_type,
+            event_type=event_type,
+            text=text,
+            topic="whatsapp.send",
+            aggregate_type="boleto",
+            aggregate_id=boleto.id,
+            recipient_phone=normalized_phone,
+            recipient_type=recipient_type,
+            deduplicate_forever=True,
+        )
+        deliveries.append(
+            WhatsAppDeliveryResult(
+                status="queued" if message else "duplicate",
+                message_id=str(message.id) if message else None,
+                recipient_type=recipient_type,
+                recipient_phone=normalized_phone,
+            )
+        )
+    return deliveries
+
+
+def _boleto_reminder_event_type(days_until_due: int) -> str:
+    suffix = f"minus_{abs(days_until_due)}" if days_until_due < 0 else str(days_until_due)
+    return f"boleto_due_{suffix}"
 
 
 def _boleto_customer_phone(boleto) -> str:

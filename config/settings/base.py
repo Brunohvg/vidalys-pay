@@ -160,6 +160,32 @@ BOLETO_NOTIFY_CUSTOMER_ON_CANCELED = env.bool(
     "BOLETO_NOTIFY_CUSTOMER_ON_CANCELED",
     default=False,
 )
+BOLETO_REMINDERS_ENABLED = env.bool("BOLETO_REMINDERS_ENABLED", default=True)
+BOLETO_REMINDER_DAYS = tuple(
+    sorted(
+        {
+            int(value)
+            for value in env.list("BOLETO_REMINDER_DAYS", default=["3", "0", "-1"])
+        },
+        reverse=True,
+    )
+)
+BOLETO_REMINDER_SCAN_SECONDS = env.int(
+    "BOLETO_REMINDER_SCAN_SECONDS",
+    default=3600,
+)
+BOLETO_REMINDER_TIME_ZONE = env(
+    "BOLETO_REMINDER_TIME_ZONE",
+    default="America/Sao_Paulo",
+)
+BOLETO_REMINDER_WHATSAPP_ENABLED = env.bool(
+    "BOLETO_REMINDER_WHATSAPP_ENABLED",
+    default=True,
+)
+BOLETO_REMINDER_NOTIFY_CUSTOMER = env.bool(
+    "BOLETO_REMINDER_NOTIFY_CUSTOMER",
+    default=False,
+)
 
 # Web Push (VAPID)
 WEBPUSH_VAPID_PUBLIC_KEY = env("WEBPUSH_VAPID_PUBLIC_KEY", default="")

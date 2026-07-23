@@ -5,12 +5,14 @@ from datetime import date
 import pytest
 
 from apps.boletos.models import Boleto, BoletoStatus, Company
+from apps.notifications.boleto_reminders import scan_boleto_reminders
 from apps.notifications.models import (
     NotificationOutbox,
     OutboxStatus,
     RecipientType,
     WhatsAppMessage,
 )
+from apps.notifications.push_service import queue_boleto_status_push
 from apps.notifications.whatsapp_service import (
     queue_boleto_created,
     queue_boleto_status,
@@ -217,3 +219,51 @@ def test_invalid_manager_phone_never_creates_outbox(settings, boleto):
     ]
     assert not NotificationOutbox.objects.exists()
     assert not WhatsAppMessage.objects.exists()
+
+
+@pytest.mark.django_db
+def test_boleto_status_push_is_idempotent_and_opens_detail(settings, boleto):
+    settings.WEBPUSH_VAPID_PUBLIC_KEY = "public"
+    settings.WEBPUSH_VAPID_PRIVATE_KEY = "private"
+
+    assert queue_boleto_status_push(boleto=boleto, event_type="boleto_paid")
+    assert not queue_boleto_status_push(boleto=boleto, event_type="boleto_paid")
+
+    item = NotificationOutbox.objects.get(topic="webpush.send")
+    assert item.aggregate_type == "boleto"
+    assert item.payload["seller_id"] == str(boleto.seller_id)
+    assert item.payload["url"] == f"/app/boletos/{boleto.id}/"
+    assert "R$ 250,90" in item.payload["body"]
+
+
+@pytest.mark.django_db
+def test_reminder_scan_queues_push_and_seller_whatsapp_once(settings, boleto):
+    settings.WEBPUSH_VAPID_PUBLIC_KEY = "public"
+    settings.WEBPUSH_VAPID_PRIVATE_KEY = "private"
+    settings.BOLETO_REMINDERS_ENABLED = True
+    settings.BOLETO_REMINDER_DAYS = (3, 0, -1)
+    settings.BOLETO_REMINDER_WHATSAPP_ENABLED = True
+    settings.BOLETO_REMINDER_NOTIFY_CUSTOMER = False
+    today = date(2026, 8, 7)
+
+    assert scan_boleto_reminders(today=today) == 1
+    assert scan_boleto_reminders(today=today) == 1
+
+    assert NotificationOutbox.objects.filter(topic="webpush.send").count() == 1
+    assert NotificationOutbox.objects.filter(topic="whatsapp.send").count() == 1
+    message = WhatsAppMessage.objects.get()
+    assert message.recipient_type == RecipientType.SELLER
+    assert message.event_type == "boleto_due_3"
+    assert "vence em 3 dias" in message.rendered_text
+
+
+@pytest.mark.django_db
+def test_reminders_ignore_non_pending_and_unconfigured_dates(settings, boleto):
+    settings.BOLETO_REMINDERS_ENABLED = True
+    settings.BOLETO_REMINDER_DAYS = (3, 0, -1)
+    settings.BOLETO_REMINDER_WHATSAPP_ENABLED = True
+    boleto.status = BoletoStatus.PAID
+    boleto.save(update_fields=["status", "updated_at"])
+
+    assert scan_boleto_reminders(today=date(2026, 8, 7)) == 0
+    assert not NotificationOutbox.objects.exists()

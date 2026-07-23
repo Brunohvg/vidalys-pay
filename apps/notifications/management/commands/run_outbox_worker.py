@@ -22,10 +22,27 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         logger.info("Outbox worker iniciado")
         self._recover_stale_items()
+        next_reminder_scan = None
         while True:
+            now = timezone.now()
+            if next_reminder_scan is None or now >= next_reminder_scan:
+                self._scan_boleto_reminders()
+                next_reminder_scan = now + timedelta(
+                    seconds=max(settings.BOLETO_REMINDER_SCAN_SECONDS, 60)
+                )
             processed = self._process_batch()
             if not processed:
                 time.sleep(settings.WORKER_POLL_SECONDS)
+
+    def _scan_boleto_reminders(self):
+        from apps.notifications.boleto_reminders import scan_boleto_reminders
+
+        try:
+            matched = scan_boleto_reminders()
+            if matched:
+                logger.info("Lembretes de boleto avaliados: %d", matched)
+        except Exception:
+            logger.exception("Falha ao avaliar lembretes de boleto")
 
     def _recover_stale_items(self):
         from apps.notifications.models import NotificationOutbox

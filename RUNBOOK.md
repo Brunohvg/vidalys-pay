@@ -26,7 +26,7 @@
 | Serviço | Comando | Porta | Descrição |
 |---------|---------|-------|-----------|
 | web | gunicorn | 8000 | API, admin, webhooks |
-| worker | run_outbox_worker | - | Processa outbox WhatsApp |
+| worker | run_outbox_worker | - | Processa WhatsApp/push e agenda lembretes de boletos |
 
 ## Variáveis de Ambiente
 
@@ -67,6 +67,12 @@
 | BOLETO_MANAGER_WHATSAPP_PHONES | vazio | Telefones de gestores separados por vírgula |
 | BOLETO_NOTIFY_CUSTOMER_ON_PAID | false | Confirma pagamento ao cliente |
 | BOLETO_NOTIFY_CUSTOMER_ON_CANCELED | false | Informa cancelamento ao cliente |
+| BOLETO_REMINDERS_ENABLED | true | Habilita a varredura de vencimentos |
+| BOLETO_REMINDER_DAYS | 3,0,-1 | Marcos: antes, no dia e depois do vencimento |
+| BOLETO_REMINDER_SCAN_SECONDS | 3600 | Intervalo mínimo entre varreduras |
+| BOLETO_REMINDER_TIME_ZONE | America/Sao_Paulo | Fuso usado para comparar datas |
+| BOLETO_REMINDER_WHATSAPP_ENABLED | true | Envia lembrete ao vendedor por WhatsApp |
+| BOLETO_REMINDER_NOTIFY_CUSTOMER | false | Envia lembrete ao cliente; requer autorização |
 
 ## Comandos
 

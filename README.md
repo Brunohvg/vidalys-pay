@@ -120,6 +120,8 @@ docker compose up --build
 | `PAGARME_WEBHOOK_BASIC_AUTH_PASSWORD` | Senha forte do webhook | Sim |
 | `CNPJ_LOOKUP_BASE_URL` | Endpoint HTTPS da consulta de CNPJ | Para boletos |
 | `BOLETO_MANAGER_WHATSAPP_PHONES` | Gestores notificados, separados por vírgula | Não |
+| `BOLETO_REMINDER_DAYS` | Marcos de lembrete, por padrão `3,0,-1` | Não |
+| `BOLETO_REMINDER_NOTIFY_CUSTOMER` | Lembretes ao cliente; desabilitado por padrão | Não |
 | `EVOLUTION_API_URL` | URL da Evolution API | Sim |
 | `EVOLUTION_API_KEY` | Chave da Evolution API | Sim |
 | `EVOLUTION_INSTANCE` | Nome da instância | Sim |
@@ -248,6 +250,12 @@ docker compose exec web python manage.py createsuperuser
 | `GUNICORN_TIMEOUT` | `60` | Timeout do Gunicorn (segundos) |
 | `WORKER_POLL_SECONDS` | `3` | Intervalo de polling do worker |
 | `MAX_NOTIFICATION_ATTEMPTS` | `5` | Tentativas máximas por notificação |
+| `BOLETO_REMINDERS_ENABLED` | `true` | Habilita lembretes de boletos pendentes |
+| `BOLETO_REMINDER_DAYS` | `3,0,-1` | Dias relativos ao vencimento |
+| `BOLETO_REMINDER_SCAN_SECONDS` | `3600` | Intervalo da varredura no worker |
+| `BOLETO_REMINDER_TIME_ZONE` | `America/Sao_Paulo` | Fuso da agenda de cobrança |
+| `BOLETO_REMINDER_WHATSAPP_ENABLED` | `true` | Lembrete ao vendedor por WhatsApp |
+| `BOLETO_REMINDER_NOTIFY_CUSTOMER` | `false` | Lembrete ao cliente por WhatsApp |
 | `WEBPUSH_VAPID_SUBJECT` | `mailto:contato@vidalys.com.br` | Contato do responsável pelo Web Push |
 | `DB_WAIT_MAX_ATTEMPTS` | `60` | Tentativas de espera pelo banco |
 | `DB_WAIT_INTERVAL_SECONDS` | `2` | Intervalo entre tentativas |
