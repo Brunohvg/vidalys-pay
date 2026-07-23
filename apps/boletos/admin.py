@@ -50,4 +50,5 @@ class BoletoAdmin(TimeStampedModelAdmin):
         "failed_at",
         "expired_at",
         "canceled_at",
+        "refunded_at",
     )

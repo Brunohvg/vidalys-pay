@@ -54,10 +54,10 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
         resource_type=resource_type,
         payment_link_id=_extract_payment_link_id(data),
         checkout_id=_extract_checkout_id(data),
-        order_id=_extract_order_id(data),
+        order_id=_extract_order_id(data, resource_type),
         order_code=data.get("code", ""),
-        charge_id=_extract_charge_id(data),
-        transaction_id=_extract_transaction_id(data),
+        charge_id=_extract_charge_id(data, resource_type),
+        transaction_id=_extract_transaction_id(data, resource_type),
         internal_payment_link_id=_extract_internal_id(data),
         internal_boleto_id=_extract_metadata_value(data, "internal_boleto_id"),
         status=data.get("status", ""),
@@ -78,22 +78,32 @@ def _extract_checkout_id(data: dict) -> str | None:
     return cid or None
 
 
-def _extract_order_id(data: dict) -> str | None:
+def _extract_order_id(data: dict, resource_type: str) -> str | None:
     oid = data.get("order", {}).get("id", "")
-    return oid or data.get("id", "") or None
-
-
-def _extract_charge_id(data: dict) -> str | None:
-    charges = data.get("charges", [])
-    if isinstance(charges, list) and charges:
-        return charges[0].get("id") or None
+    if oid:
+        return oid
+    if resource_type == "order":
+        return data.get("id", "") or None
     return None
 
 
-def _extract_transaction_id(data: dict) -> str | None:
+def _extract_charge_id(data: dict, resource_type: str) -> str | None:
+    charges = data.get("charges", [])
+    if isinstance(charges, list) and charges:
+        return charges[0].get("id") or None
+    if resource_type == "charge":
+        return data.get("id") or None
+    return None
+
+
+def _extract_transaction_id(data: dict, resource_type: str) -> str | None:
     charges = data.get("charges", [])
     if isinstance(charges, list) and charges:
         last_txn = charges[0].get("last_transaction", {})
+        if isinstance(last_txn, dict):
+            return last_txn.get("id") or None
+    if resource_type == "charge":
+        last_txn = data.get("last_transaction", {})
         if isinstance(last_txn, dict):
             return last_txn.get("id") or None
     return None

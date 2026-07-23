@@ -10,13 +10,20 @@ class WebhookEventAdmin(admin.ModelAdmin):
     list_display = (
         "event_type",
         "provider_event_id",
+        "boleto",
         "authenticity_status",
         "processing_status",
         "attempts",
         "received_at",
     )
     list_filter = ("authenticity_status", "processing_status", "event_type")
-    search_fields = ("provider_event_id", "event_type")
+    search_fields = (
+        "provider_event_id",
+        "event_type",
+        "boleto__internal_reference",
+        "boleto__provider_order_id",
+        "boleto__provider_charge_id",
+    )
     readonly_fields = (
         "payload",
         "headers_summary",

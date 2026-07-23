@@ -5,6 +5,11 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from apps.boletos.services.webhook_processing import (
+    find_boleto,
+    is_boleto_event,
+    process_boleto_event,
+)
 from apps.notifications.push_service import queue_payment_status_push
 from apps.notifications.whatsapp_service import (
     queue_payment_approved,
@@ -29,6 +34,24 @@ def process_webhook_event(event: WebhookEvent) -> bool:
     Called via transaction.on_commit â€” the event is already persisted.
     """
     WebhookEvent.objects.filter(pk=event.pk).update(attempts=F("attempts") + 1)
+    normalized = normalize_event(event.payload)
+    boleto = find_boleto(normalized)
+
+    if is_boleto_event(normalized, boleto):
+        try:
+            return process_boleto_event(event, normalized, boleto)
+        except Exception:
+            logger.exception(
+                "Erro ao processar evento %s para boleto=%s",
+                event.event_type,
+                boleto.id if boleto else None,
+            )
+            event.processing_status = ProcessingStatus.FAILED
+            event.error_code = "PROCESSING_ERROR"
+            event.error_detail = ""
+            event.save(update_fields=["processing_status", "error_code", "error_detail"])
+            return False
+
     config = get_event_config(event.event_type)
 
     if config is None:
@@ -46,7 +69,6 @@ def process_webhook_event(event: WebhookEvent) -> bool:
         event.save(update_fields=["processing_status", "processed_at"])
         return True
 
-    normalized = normalize_event(event.payload)
     payment_link = _find_payment_link(event, normalized)
 
     if payment_link is None:

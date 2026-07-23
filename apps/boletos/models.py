@@ -118,6 +118,7 @@ class Boleto(UUIDModel, TimeStampedModel):
     failed_at = models.DateTimeField(null=True, blank=True)
     expired_at = models.DateTimeField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Boleto"

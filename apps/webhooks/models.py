@@ -21,6 +21,13 @@ class WebhookEvent(UUIDModel):
     """Evento bruto recebido de webhook externo."""
 
     provider = models.CharField(max_length=30, default="pagarme")
+    boleto = models.ForeignKey(
+        "boletos.Boleto",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="webhook_events",
+    )
     provider_event_id = models.CharField(max_length=120, blank=True, default="", unique=True, null=True)
     event_type = models.CharField(max_length=120)
     payload = models.JSONField()
