@@ -199,17 +199,15 @@ vidalys-pay/
 ### Pré-requisitos
 
 - PostgreSQL criado ou selecionado no Coolify
-- Aplicação conectada à rede predefinida do Coolify quando o PostgreSQL estiver
-  em outro recurso
+- Aplicação e banco na mesma rede interna (`coolify`)
 
 ### Passo a passo
 
-1. **Configure o PostgreSQL** no Coolify e copie a **Internal URL** atual
-2. **Ative `Connect to Predefined Network`** na aplicação quando o banco estiver em outro recurso/stack
-3. **Conecte o repositório** ao Coolify e selecione **Docker Compose**
-4. **Configure o domínio** no serviço `web`, porta `8000`
-5. **Preencha as variáveis de ambiente** (veja tabela abaixo)
-6. **Deploy**
+1. **Configure o PostgreSQL** no Coolify e copie a URL interna de conexão (formato `postgresql://usuario:senha@host-interno:5432/nome-do-banco`)
+2. **Conecte o repositório** ao Coolify e selecione **Docker Compose**
+3. **Configure o domínio** no serviço `web`, porta `8000`
+4. **Preencha as variáveis de ambiente** (veja tabela abaixo)
+5. **Deploy**
 
 Após o primeiro deploy, crie o superusuário:
 
@@ -272,8 +270,7 @@ curl -s https://pay.vidalys.com.br/health/ready/
 - **Nunca** use `localhost` como host do banco de dados
 - **Nunca** defina `DB_HOST`, `DB_PORT`, `POSTGRES_USER` — use apenas `DATABASE_URL`
 - O banco PostgreSQL é externo, gerenciado pelo Coolify
-- Não declare uma rede `coolify` manualmente no Compose; use a rede gerenciada
-  e a opção `Connect to Predefined Network` do Coolify
+- A rede `coolify` deve ser externa (`external: true`) no compose
 
 Veja `RUNBOOK.md` para procedimentos operacionais.
 O fluxo completo de boletos está documentado em [`docs/BOLETOS.md`](docs/BOLETOS.md).

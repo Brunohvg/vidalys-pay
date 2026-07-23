@@ -142,19 +142,6 @@ services:
 2. Adicione o domínio (ex: `pay.vidalys.com.br`)
 3. Ative HTTPS automático
 
-### Rede e PostgreSQL externo
-
-Quando o PostgreSQL está em outro recurso do Coolify:
-
-1. Ative **Connect to Predefined Network** na aplicação.
-2. Copie a **Internal URL** atual mostrada no recurso PostgreSQL.
-3. Salve essa URL completa em `DATABASE_URL`.
-4. Não declare redes personalizadas no Compose.
-
-Um erro `failed to resolve host` significa que o DNS interno não conhece o
-hostname informado. Normalmente a URL ficou antiga após recriar o banco ou a
-aplicação não foi conectada à rede predefinida. Retry não corrige essa condição.
-
 ### 4. Variáveis de Ambiente
 
 1. Vá em "Environment Variables"
