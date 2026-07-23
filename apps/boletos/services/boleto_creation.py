@@ -166,7 +166,18 @@ def create_boleto(
             "updated_at",
         ]
     )
+    transaction.on_commit(
+        lambda boleto_id=boleto.id: _queue_created_notification(boleto_id),
+        robust=True,
+    )
     return CreateBoletoResult(boleto, True)
+
+
+def _queue_created_notification(boleto_id) -> None:
+    from apps.notifications.whatsapp_service import queue_boleto_created
+
+    boleto = Boleto.objects.select_related("seller").get(pk=boleto_id)
+    queue_boleto_created(boleto=boleto)
 
 
 def _validate_creation(seller, actor_user, actor_seller, data, idempotency_key) -> str:

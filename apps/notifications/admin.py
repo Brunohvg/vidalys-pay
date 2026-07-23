@@ -5,8 +5,21 @@ from .models import NotificationOutbox, PushSubscription, WhatsAppMessage
 
 @admin.register(WhatsAppMessage)
 class WhatsAppMessageAdmin(admin.ModelAdmin):
-    list_display = ("template_key", "recipient_phone", "status", "attempt_count", "created_at")
-    list_filter = ("status",)
+    list_display = (
+        "template_key",
+        "recipient_type",
+        "recipient_phone",
+        "boleto",
+        "status",
+        "attempt_count",
+        "created_at",
+    )
+    list_filter = ("status", "recipient_type", "event_type")
+    search_fields = (
+        "recipient_phone",
+        "boleto__internal_reference",
+        "boleto__provider_order_id",
+    )
     readonly_fields = ("created_at",)
 
 

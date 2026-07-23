@@ -15,6 +15,7 @@ class WhatsAppMessageStatus(models.TextChoices):
 class RecipientType(models.TextChoices):
     SELLER = "seller", "Vendedor"
     CUSTOMER = "customer", "Cliente"
+    MANAGER = "manager", "Gestor"
 
 
 class WhatsAppMessage(UUIDModel):
@@ -23,6 +24,13 @@ class WhatsAppMessage(UUIDModel):
     seller = models.ForeignKey("sellers.Seller", on_delete=models.CASCADE, related_name="whatsapp_messages")
     payment_link = models.ForeignKey(
         "payment_links.PaymentLink",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="whatsapp_messages",
+    )
+    boleto = models.ForeignKey(
+        "boletos.Boleto",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -2,12 +2,16 @@
 import logging
 from dataclasses import dataclass
 
+from django.conf import settings
 from django.db import transaction
 
 from apps.sellers.models import Seller
 
 from .models import NotificationOutbox, RecipientType, WhatsAppMessage, WhatsAppMessageStatus
 from .templates_msg import (
+    boleto_created_customer_message,
+    boleto_created_seller_message,
+    boleto_status_message,
     invitation_message,
     payment_approved_message,
     payment_canceled_message,
@@ -290,8 +294,10 @@ def _queue_message(
     aggregate_type: str,
     aggregate_id,
     payment_link=None,
+    boleto=None,
     recipient_phone: str,
     recipient_type: str,
+    deduplicate_forever: bool = False,
 ) -> WhatsAppMessage | None:
     """Create outbox entry and WhatsApp message record.
 
@@ -301,10 +307,12 @@ def _queue_message(
     dedup_key = f"{aggregate_type}:{aggregate_id}:{event_type}:{recipient_type}:{recipient_phone}"
 
     with transaction.atomic():
-        existing = NotificationOutbox.objects.filter(
-            deduplication_key=dedup_key,
-            status__in=["PENDING", "PROCESSING"],
-        ).first()
+        existing_query = NotificationOutbox.objects.filter(deduplication_key=dedup_key)
+        existing = (
+            existing_query.first()
+            if deduplicate_forever
+            else existing_query.filter(status__in=["PENDING", "PROCESSING"]).first()
+        )
 
         if existing:
             logger.info("Mensagem duplicada ignorada: %s", dedup_key)
@@ -315,6 +323,7 @@ def _queue_message(
         message = WhatsAppMessage.objects.create(
             seller=seller,
             payment_link=payment_link,
+            boleto=boleto,
             template_key=template_key,
             event_type=event_type,
             recipient_type=recipient_type,
@@ -343,3 +352,109 @@ def _queue_message(
         recipient_phone,
     )
     return message
+
+
+def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
+    """Queue the creation notice for seller and, when available, customer."""
+    deliveries = []
+    recipients = [
+        (
+            RecipientType.SELLER,
+            _normalize_whatsapp_phone(boleto.seller.whatsapp_phone),
+            "boleto_created_seller",
+            boleto_created_seller_message(boleto=boleto),
+        ),
+    ]
+    customer_phone = _boleto_customer_phone(boleto)
+    if customer_phone:
+        recipients.append(
+            (
+                RecipientType.CUSTOMER,
+                customer_phone,
+                "boleto_created_customer",
+                boleto_created_customer_message(boleto=boleto),
+            )
+        )
+
+    for recipient_type, phone, template_key, text in recipients:
+        message = _queue_message(
+            seller=boleto.seller,
+            boleto=boleto,
+            template_key=template_key,
+            event_type="boleto_created",
+            text=text,
+            topic="whatsapp.send",
+            aggregate_type="boleto",
+            aggregate_id=boleto.id,
+            recipient_phone=phone,
+            recipient_type=recipient_type,
+            deduplicate_forever=True,
+        )
+        deliveries.append(
+            WhatsAppDeliveryResult(
+                status="queued" if message else "duplicate",
+                message_id=str(message.id) if message else None,
+                recipient_type=recipient_type,
+                recipient_phone=phone,
+            )
+        )
+    return deliveries
+
+
+def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResult]:
+    """Queue one deduplicated status notice for each configured recipient."""
+    text = boleto_status_message(boleto=boleto, event_type=event_type)
+    recipients = [(RecipientType.SELLER, boleto.seller.whatsapp_phone)]
+
+    if event_type == "boleto_paid" and settings.BOLETO_NOTIFY_CUSTOMER_ON_PAID:
+        customer_phone = _boleto_customer_phone(boleto)
+        if customer_phone:
+            recipients.append((RecipientType.CUSTOMER, customer_phone))
+    if event_type == "boleto_canceled" and settings.BOLETO_NOTIFY_CUSTOMER_ON_CANCELED:
+        customer_phone = _boleto_customer_phone(boleto)
+        if customer_phone:
+            recipients.append((RecipientType.CUSTOMER, customer_phone))
+    if event_type in {"boleto_paid", "boleto_canceled"}:
+        recipients.extend(
+            (RecipientType.MANAGER, phone)
+            for phone in settings.BOLETO_MANAGER_WHATSAPP_PHONES
+            if phone
+        )
+
+    deliveries = []
+    for recipient_type, phone in recipients:
+        message = _queue_message(
+            seller=boleto.seller,
+            boleto=boleto,
+            template_key=event_type,
+            event_type=event_type,
+            text=text,
+            topic="whatsapp.send",
+            aggregate_type="boleto",
+            aggregate_id=boleto.id,
+            recipient_phone=_normalize_whatsapp_phone(phone),
+            recipient_type=recipient_type,
+            deduplicate_forever=True,
+        )
+        deliveries.append(
+            WhatsAppDeliveryResult(
+                status="queued" if message else "duplicate",
+                message_id=str(message.id) if message else None,
+                recipient_type=recipient_type,
+                recipient_phone=phone,
+            )
+        )
+    return deliveries
+
+
+def _boleto_customer_phone(boleto) -> str:
+    snapshot = boleto.company_snapshot
+    phone = snapshot.get("whatsapp_phone") or snapshot.get("phone") or ""
+    return _normalize_whatsapp_phone(phone)
+
+
+def _normalize_whatsapp_phone(phone: str) -> str:
+    digits = "".join(character for character in phone if character.isdigit())
+    if len(digits) in {10, 11}:
+        return f"55{digits}"
+    return digits

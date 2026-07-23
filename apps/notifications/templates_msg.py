@@ -121,3 +121,47 @@ def payment_chargedback_message(*, reference: str, amount_cents: int) -> str:
         f"Um chargeback foi registrado para este pagamento. "
         f"Verifique a disputa no painel do Pagar.me."
     )
+
+
+def boleto_created_seller_message(*, boleto) -> str:
+    return (
+        "Boleto emitido\n\n"
+        f"Empresa: {boleto.company_snapshot['legal_name']}\n"
+        f"CNPJ: {boleto.company_snapshot['cnpj']}\n"
+        f"Valor: {_brl(boleto.amount_cents)}\n"
+        f"Vencimento: {boleto.due_date:%d/%m/%Y}\n"
+        "Status: Aguardando pagamento"
+    )
+
+
+def boleto_created_customer_message(*, boleto) -> str:
+    lines = [
+        f"Boleto emitido por {settings.APP_NAME}",
+        "",
+        f"Valor: {_brl(boleto.amount_cents)}",
+        f"Vencimento: {boleto.due_date:%d/%m/%Y}",
+        f"Linha digitável: {boleto.digitable_line}",
+    ]
+    if boleto.pdf_url:
+        lines.extend(["", f"PDF: {boleto.pdf_url}"])
+    return "\n".join(lines)
+
+
+def boleto_status_message(*, boleto, event_type: str) -> str:
+    headings = {
+        "boleto_paid": "Pagamento de boleto confirmado",
+        "boleto_failed": "Falha na cobrança do boleto",
+        "boleto_canceled": "Boleto cancelado",
+        "boleto_partially_canceled": "Boleto parcialmente cancelado",
+        "boleto_expired": "Boleto vencido",
+        "boleto_refunded": "Pagamento do boleto estornado",
+    }
+    lines = [
+        headings[event_type],
+        "",
+        f"Empresa: {boleto.company_snapshot['legal_name']}",
+        f"Valor: {_brl(boleto.amount_cents)}",
+    ]
+    if event_type == "boleto_paid" and boleto.paid_at:
+        lines.append(f"Confirmado em: {boleto.paid_at:%d/%m/%Y %H:%M}")
+    return "\n".join(lines)

@@ -27,6 +27,15 @@ EVENT_STATUS = {
     "charge.refunded": BoletoStatus.REFUNDED,
 }
 
+NOTIFICATION_EVENTS = {
+    BoletoStatus.PAID: "boleto_paid",
+    BoletoStatus.FAILED: "boleto_failed",
+    BoletoStatus.EXPIRED: "boleto_expired",
+    BoletoStatus.CANCELED: "boleto_canceled",
+    BoletoStatus.PARTIALLY_CANCELED: "boleto_partially_canceled",
+    BoletoStatus.REFUNDED: "boleto_refunded",
+}
+
 ALLOWED_TRANSITIONS = {
     BoletoStatus.CREATING: set(BoletoStatus.values),
     BoletoStatus.CREATION_UNKNOWN: set(BoletoStatus.values),
@@ -85,6 +94,7 @@ def process_boleto_event(event: WebhookEvent, normalized, boleto: Boleto | None)
         boleto = Boleto.objects.select_for_update().get(pk=boleto.pk)
         target_status = EVENT_STATUS.get(event.event_type)
         changed_fields = _reconcile_provider_ids(boleto, normalized)
+        status_changed = target_status is not None and target_status != boleto.status
 
         event.boleto = boleto
         if target_status is None:
@@ -130,6 +140,13 @@ def process_boleto_event(event: WebhookEvent, normalized, boleto: Boleto | None)
             boleto.save(update_fields=[*dict.fromkeys(changed_fields), "updated_at"])
 
         _finish_event(event, ProcessingStatus.PROCESSED, boleto=boleto)
+        if status_changed and target_status in NOTIFICATION_EVENTS:
+            transaction.on_commit(
+                lambda boleto_id=boleto.id, notification_event=NOTIFICATION_EVENTS[
+                    target_status
+                ]: _queue_status_notification(boleto_id, notification_event),
+                robust=True,
+            )
         return True
 
 
@@ -167,3 +184,10 @@ def _finish_event(
             "processed_at",
         ]
     )
+
+
+def _queue_status_notification(boleto_id, event_type: str) -> None:
+    from apps.notifications.whatsapp_service import queue_boleto_status
+
+    boleto = Boleto.objects.select_related("seller").get(pk=boleto_id)
+    queue_boleto_status(boleto=boleto, event_type=event_type)
