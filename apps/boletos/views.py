@@ -5,7 +5,7 @@ from datetime import date
 from django.contrib import messages
 from django.core import signing
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect, rende
 from django.views.decorators.http import require_http_methods
 
 from apps.admin_panel.views import admin_required
@@ -16,7 +16,7 @@ from apps.boletos.selectors import boleto_list_page, boleto_metrics
 from apps.boletos.services.boleto_creation import BoletoCreationData, create_boleto
 from apps.notifications.models import WhatsAppMessage
 from apps.sellers.decorators import seller_login_required
-from apps.sellers.models import Seller
+from apps.sellers.models import Selle
 
 REVIEW_SALT = "boletos.creation.review.v1"
 REVIEW_MAX_AGE_SECONDS = 60 * 60
@@ -55,7 +55,6 @@ def seller_boleto_list(request):
             "active_tab": "boleto",
             "page_obj": page,
             "boletos": page.object_list,
-            "metrics": boleto_metrics(actor=actor),
             "status_choices": Boleto._meta.get_field("status").choices,
             "filters": request.GET,
             "query_without_page": query_without_page,
@@ -143,7 +142,7 @@ def _creation_flow(request, *, actor, template_name, detail_route, sellers=None)
         "active_tab": "boleto",
     }
     if actor.is_seller:
-        context["seller"] = actor.seller
+        context["seller"] = actor.selle
 
     if request.method == "GET":
         return render(request, template_name, context)

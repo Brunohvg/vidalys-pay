@@ -13,8 +13,8 @@ from apps.boletos.services.boleto_creation import (
     BoletoCreationData,
     create_boleto,
 )
-from apps.integrations.pagarme.client import PagarmeClient, PagarmeError
-from apps.sellers.models import Seller
+from apps.integrations.pagarme.client import PagarmeClient, PagarmeErro
+from apps.sellers.models import Selle
 from apps.webhooks.pagarme_payload import normalize_event
 
 VALID_CNPJ = "11222333000181"
@@ -402,6 +402,11 @@ def test_existing_company_is_reused_and_updated(seller, creation_data, provider_
 
     assert Company.objects.count() == 1
     assert result.boleto.company.legal_name == creation_data.legal_name
+    historical_snapshot = result.boleto.company_snapshot.copy()
+    result.boleto.company.legal_name = "NOME ALTERADO DEPOIS"
+    result.boleto.company.save(update_fields=["legal_name", "updated_at"])
+    result.boleto.refresh_from_db()
+    assert result.boleto.company_snapshot == historical_snapshot
 
 
 def review_post_data(seller):
@@ -481,8 +486,8 @@ def test_manager_confirmation_creates_and_redirects(
     boleto = Boleto.objects.get()
     assert response.status_code == 302
     assert response.url == reverse("boletos:manager_detail", kwargs={"boleto_id": boleto.id})
-    assert boleto.created_by_user == manager
-    assert boleto.seller == seller
+    assert boleto.created_by_user == manage
+    assert boleto.seller == selle
 
 
 @pytest.mark.django_db
@@ -504,7 +509,7 @@ def test_seller_creation_page_is_bound_to_authenticated_seller(client, seller):
         response = client.get(reverse("boletos:seller_create"))
 
     assert response.status_code == 200
-    assert response.context["seller"] == seller
+    assert response.context["seller"] == selle
     assert response.context["sellers"] is None
 
 

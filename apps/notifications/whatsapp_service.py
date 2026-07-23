@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import transaction
 
-from apps.sellers.models import Seller
+from apps.sellers.models import Selle
 
 from .models import NotificationOutbox, RecipientType, WhatsAppMessage, WhatsAppMessageStatus
 from .templates_msg import (
@@ -67,7 +67,7 @@ def queue_payment_link_created(
     results = []
     customer_phone = getattr(payment_link, "customer_phone", None) or None
 
-    # 1. Always queue for seller
+    # 1. Always queue for selle
     text = payment_link_created_message(
         reference=payment_link.reference,
         customer_name=payment_link.customer_name or None,
@@ -102,7 +102,7 @@ def queue_payment_link_created(
             recipient_phone="",
         ))
 
-    # 2. Optionally queue for customer
+    # 2. Optionally queue for custome
     if customer_phone:
         customer_text = payment_link_created_message(
             reference=payment_link.reference,
@@ -310,7 +310,7 @@ def _queue_message(
         existing_query = NotificationOutbox.objects.filter(deduplication_key=dedup_key)
         existing = (
             existing_query.first()
-            if deduplicate_forever
+            if deduplicate_foreve
             else existing_query.filter(status__in=["PENDING", "PROCESSING"]).first()
         )
 
@@ -360,23 +360,31 @@ def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
     recipients = [
         (
             RecipientType.SELLER,
-            _normalize_whatsapp_phone(boleto.seller.whatsapp_phone),
+            boleto.seller.whatsapp_phone,
             "boleto_created_seller",
             boleto_created_seller_message(boleto=boleto),
         ),
     ]
-    customer_phone = _boleto_customer_phone(boleto)
-    if customer_phone:
-        recipients.append(
-            (
-                RecipientType.CUSTOMER,
-                customer_phone,
-                "boleto_created_customer",
-                boleto_created_customer_message(boleto=boleto),
-            )
+    recipients.append(
+        (
+            RecipientType.CUSTOMER,
+            _boleto_customer_phone(boleto),
+            "boleto_created_customer",
+            boleto_created_customer_message(boleto=boleto),
         )
+    )
 
     for recipient_type, phone, template_key, text in recipients:
+        phone_status, normalized_phone = _phone_status(phone)
+        if phone_status != "queued":
+            deliveries.append(
+                WhatsAppDeliveryResult(
+                    status=phone_status,
+                    recipient_type=recipient_type,
+                    recipient_phone="",
+                )
+            )
+            continue
         message = _queue_message(
             seller=boleto.seller,
             boleto=boleto,
@@ -386,7 +394,7 @@ def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
             topic="whatsapp.send",
             aggregate_type="boleto",
             aggregate_id=boleto.id,
-            recipient_phone=phone,
+            recipient_phone=normalized_phone,
             recipient_type=recipient_type,
             deduplicate_forever=True,
         )
@@ -395,7 +403,7 @@ def queue_boleto_created(*, boleto) -> list[WhatsAppDeliveryResult]:
                 status="queued" if message else "duplicate",
                 message_id=str(message.id) if message else None,
                 recipient_type=recipient_type,
-                recipient_phone=phone,
+                recipient_phone=normalized_phone,
             )
         )
     return deliveries
@@ -408,12 +416,10 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
 
     if event_type == "boleto_paid" and settings.BOLETO_NOTIFY_CUSTOMER_ON_PAID:
         customer_phone = _boleto_customer_phone(boleto)
-        if customer_phone:
-            recipients.append((RecipientType.CUSTOMER, customer_phone))
+        recipients.append((RecipientType.CUSTOMER, customer_phone))
     if event_type == "boleto_canceled" and settings.BOLETO_NOTIFY_CUSTOMER_ON_CANCELED:
         customer_phone = _boleto_customer_phone(boleto)
-        if customer_phone:
-            recipients.append((RecipientType.CUSTOMER, customer_phone))
+        recipients.append((RecipientType.CUSTOMER, customer_phone))
     if event_type in {"boleto_paid", "boleto_canceled"}:
         recipients.extend(
             (RecipientType.MANAGER, phone)
@@ -423,6 +429,16 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
 
     deliveries = []
     for recipient_type, phone in recipients:
+        phone_status, normalized_phone = _phone_status(phone)
+        if phone_status != "queued":
+            deliveries.append(
+                WhatsAppDeliveryResult(
+                    status=phone_status,
+                    recipient_type=recipient_type,
+                    recipient_phone="",
+                )
+            )
+            continue
         message = _queue_message(
             seller=boleto.seller,
             boleto=boleto,
@@ -432,7 +448,7 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
             topic="whatsapp.send",
             aggregate_type="boleto",
             aggregate_id=boleto.id,
-            recipient_phone=_normalize_whatsapp_phone(phone),
+            recipient_phone=normalized_phone,
             recipient_type=recipient_type,
             deduplicate_forever=True,
         )
@@ -441,7 +457,7 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
                 status="queued" if message else "duplicate",
                 message_id=str(message.id) if message else None,
                 recipient_type=recipient_type,
-                recipient_phone=phone,
+                recipient_phone=normalized_phone,
             )
         )
     return deliveries
@@ -449,12 +465,26 @@ def queue_boleto_status(*, boleto, event_type: str) -> list[WhatsAppDeliveryResu
 
 def _boleto_customer_phone(boleto) -> str:
     snapshot = boleto.company_snapshot
-    phone = snapshot.get("whatsapp_phone") or snapshot.get("phone") or ""
-    return _normalize_whatsapp_phone(phone)
+    return snapshot.get("whatsapp_phone") or snapshot.get("phone") or ""
 
 
 def _normalize_whatsapp_phone(phone: str) -> str:
-    digits = "".join(character for character in phone if character.isdigit())
-    if len(digits) in {10, 11}:
-        return f"55{digits}"
-    return digits
+    digits = "".join(character for character in str(phone or "") if character.isdigit())
+    if digits.startswith("55") and len(digits) in {12, 13}:
+        digits = digits[2:]
+    if len(digits) not in {10, 11}:
+        return ""
+    if digits[0] == "0" or digits[1] == "0" or set(digits) == {"0"}:
+        return ""
+    if len(digits) == 11 and digits[2] != "9":
+        return ""
+    return f"55{digits}"
+
+
+def _phone_status(phone: str) -> tuple[str, str]:
+    if not str(phone or "").strip():
+        return "missing_phone", ""
+    normalized = _normalize_whatsapp_phone(phone)
+    if not normalized:
+        return "invalid_phone", ""
+    return "queued", normalized

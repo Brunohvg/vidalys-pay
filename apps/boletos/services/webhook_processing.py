@@ -16,7 +16,6 @@ EVENT_STATUS = {
     "order.paid": BoletoStatus.PAID,
     "order.payment_failed": BoletoStatus.FAILED,
     "order.canceled": BoletoStatus.CANCELED,
-    "order.closed": BoletoStatus.EXPIRED,
     "charge.created": BoletoStatus.PENDING,
     "charge.pending": BoletoStatus.PENDING,
     "charge.paid": BoletoStatus.PAID,
@@ -37,9 +36,29 @@ NOTIFICATION_EVENTS = {
 }
 
 ALLOWED_TRANSITIONS = {
-    BoletoStatus.CREATING: set(BoletoStatus.values),
-    BoletoStatus.CREATION_UNKNOWN: set(BoletoStatus.values),
-    BoletoStatus.CREATION_ERROR: {BoletoStatus.PENDING, BoletoStatus.PAID},
+    BoletoStatus.CREATING: {
+        BoletoStatus.PENDING,
+        BoletoStatus.PAID,
+        BoletoStatus.FAILED,
+        BoletoStatus.CANCELED,
+        BoletoStatus.EXPIRED,
+        BoletoStatus.CREATION_ERROR,
+        BoletoStatus.CREATION_UNKNOWN,
+    },
+    BoletoStatus.CREATION_UNKNOWN: {
+        BoletoStatus.PENDING,
+        BoletoStatus.PAID,
+        BoletoStatus.FAILED,
+        BoletoStatus.CANCELED,
+        BoletoStatus.EXPIRED,
+    },
+    BoletoStatus.CREATION_ERROR: {
+        BoletoStatus.PENDING,
+        BoletoStatus.PAID,
+        BoletoStatus.FAILED,
+        BoletoStatus.CANCELED,
+        BoletoStatus.EXPIRED,
+    },
     BoletoStatus.PENDING: {
         BoletoStatus.PAID,
         BoletoStatus.FAILED,
@@ -92,7 +111,16 @@ def process_boleto_event(event: WebhookEvent, normalized, boleto: Boleto | None)
 
     with transaction.atomic():
         boleto = Boleto.objects.select_for_update().get(pk=boleto.pk)
-        target_status = EVENT_STATUS.get(event.event_type)
+        if _has_provider_id_mismatch(boleto, normalized):
+            _finish_event(
+                event,
+                ProcessingStatus.FAILED,
+                boleto=boleto,
+                error_code="BOLETO_PROVIDER_ID_MISMATCH",
+            )
+            return False
+
+        target_status = resolve_target_status(event.event_type, normalized)
         changed_fields = _reconcile_provider_ids(boleto, normalized)
         status_changed = target_status is not None and target_status != boleto.status
 
@@ -155,6 +183,46 @@ def process_boleto_event(event: WebhookEvent, normalized, boleto: Boleto | None)
                 robust=True,
             )
         return True
+
+
+def resolve_target_status(event_type: str, normalized) -> str | None:
+    """Resolve state without inferring expiry from an order closure alone."""
+    if event_type != "order.closed":
+        return EVENT_STATUS.get(event_type)
+
+    statuses = {
+        str(status).strip().lower()
+        for status in (
+            normalized.charge_status,
+            normalized.transaction_status,
+            normalized.status,
+        )
+        if status
+    }
+    for provider_statuses, boleto_status in (
+        ({"paid", "captured"}, BoletoStatus.PAID),
+        ({"canceled", "cancelled", "voided"}, BoletoStatus.CANCELED),
+        ({"expired", "overdue"}, BoletoStatus.EXPIRED),
+        ({"failed", "payment_failed", "not_authorized"}, BoletoStatus.FAILED),
+    ):
+        if statuses & provider_statuses:
+            return boleto_status
+    return None
+
+
+def _has_provider_id_mismatch(boleto: Boleto, normalized) -> bool:
+    """Reject conflicting IDs before changing the aggregate."""
+    for field, incoming in (
+        ("provider_order_id", normalized.order_id),
+        ("provider_charge_id", normalized.charge_id),
+        ("provider_transaction_id", normalized.transaction_id),
+    ):
+        current = getattr(boleto, field)
+        if current and incoming and current != incoming:
+            return True
+        if incoming and Boleto.objects.exclude(pk=boleto.pk).filter(**{field: incoming}).exists():
+            return True
+    return False
 
 
 def _reconcile_provider_ids(boleto: Boleto, normalized) -> list[str]:

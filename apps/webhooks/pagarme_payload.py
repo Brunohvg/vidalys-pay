@@ -19,8 +19,8 @@ class FailureReason:
 @dataclass(frozen=True)
 class NormalizedEvent:
     """Normalized webhook event from Pagar.me."""
-    event_id: str
-    event_type: str
+    event_id: st
+    event_type: st
     resource_type: str = ""
     payment_link_id: str | None = None
     checkout_id: str | None = None
@@ -31,6 +31,8 @@ class NormalizedEvent:
     internal_payment_link_id: str | None = None
     internal_boleto_id: str | None = None
     status: str | None = None
+    charge_status: str | None = None
+    transaction_status: str | None = None
     amount_cents: int | None = None
     installments: int | None = None
     payment_method: str | None = None
@@ -61,6 +63,8 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
         internal_payment_link_id=_extract_internal_id(data),
         internal_boleto_id=_extract_metadata_value(data, "internal_boleto_id"),
         status=_optional_text(data.get("status")),
+        charge_status=_extract_charge_status(data, resource_type),
+        transaction_status=_extract_transaction_status(data, resource_type),
         amount_cents=_extract_amount(data),
         installments=_extract_installments(data),
         payment_method=_extract_payment_method(data),
@@ -104,6 +108,24 @@ def _extract_transaction_id(data: dict, resource_type: str) -> str | None:
         last_txn = data.get("last_transaction", {})
         if isinstance(last_txn, dict):
             return _optional_text(last_txn.get("id"))
+    return None
+
+
+def _extract_charge_status(data: dict, resource_type: str) -> str | None:
+    charge = _get_first_charge(data)
+    if charge:
+        return _optional_text(charge.get("status"))
+    if resource_type == "charge":
+        return _optional_text(data.get("status"))
+    return None
+
+
+def _extract_transaction_status(data: dict, resource_type: str) -> str | None:
+    charge = _get_first_charge(data)
+    if charge:
+        return _optional_text(_as_dict(charge.get("last_transaction")).get("status"))
+    if resource_type == "charge":
+        return _optional_text(_as_dict(data.get("last_transaction")).get("status"))
     return None
 
 

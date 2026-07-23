@@ -1,4 +1,5 @@
 {% load formatting %}
+{% if is_manager %}
 <section class="boleto-metrics" aria-label="Resumo dos boletos">
     <article class="boleto-metric boleto-metric--value"><span>Valor recebido</span><strong>{{ metrics.received_amount|format_brl }}</strong></article>
     <article class="boleto-metric boleto-metric--value"><span>Valor emitido</span><strong>{{ metrics.issued_amount|format_brl }}</strong></article>
@@ -8,8 +9,9 @@
     <article class="boleto-metric"><span>Emitidos hoje</span><strong>{{ metrics.issued_today }}</strong></article>
     <article class="boleto-metric"><span>Próx. vencimento</span><strong>{{ metrics.due_soon }}</strong></article>
 </section>
+{% endif %}
 
-<form class="boleto-filters" method="get">
+<form class="boleto-filters{% if not is_manager %} boleto-filters--seller{% endif %}" method="get">
     <div class="boleto-search">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="search" name="q" value="{{ filters.q }}" placeholder="Empresa, CNPJ ou referência" aria-label="Buscar boletos">
@@ -30,6 +32,13 @@
     </div>
     <div class="boleto-filter-actions"><button type="submit">Aplicar filtros</button><a href=".">Limpar</a></div>
 </form>
+
+<header class="boleto-list-heading">
+    <div>
+        <h2>{% if is_manager %}Boletos emitidos{% else %}Seus boletos{% endif %}</h2>
+        <p>{{ page_obj.paginator.count }} cobrança{{ page_obj.paginator.count|pluralize:"s" }} encontrada{{ page_obj.paginator.count|pluralize:"s" }}</p>
+    </div>
+</header>
 
 {% if boletos %}
 <div class="boleto-list">

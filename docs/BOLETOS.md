@@ -3,8 +3,12 @@
 ## Escopo
 
 O Vidalys Pay emite boletos exclusivamente para pessoas jurídicas com CNPJ. CPF
-não é aceito. Gestores podem emitir e consultar boletos de qualquer vendedor
+não é aceito. Gestores podem emitir e consultar boletos de qualquer vendedo
 ativo; vendedores só operam e visualizam seus próprios boletos.
+
+No painel Vidalys Pay, “gestor” é o usuário autenticado com `is_superuser`.
+Essa é a mesma regra de acesso administrativo já adotada pelo painel; não há
+um segundo perfil de gestor implícito.
 
 O Flowlog foi usado como referência funcional. A implementação final segue os
 models, autenticação, cliente Pagar.me, endpoint de webhook, outbox e padrões
@@ -58,6 +62,11 @@ indicam explicitamente um boleto inexistente ficam como `FAILED` com
 Eventos tratados incluem pagamento, falha, pendência, cancelamento,
 cancelamento parcial, vencimento e estorno.
 
+`order.closed` não significa vencimento por si só. O estado somente muda
+quando order, charge ou última transação indicarem explicitamente pagamento,
+cancelamento, vencimento/expiração ou falha. Um fechamento inconclusivo é
+marcado como `IGNORED`.
+
 ## Notificações
 
 As mensagens usam `NotificationOutbox` e o worker existente. Não há chamada
@@ -70,6 +79,17 @@ entrega concluída.
 - Falha: somente vendedor, sem detalhes técnicos.
 - Cancelamento: vendedor; cliente e gestores conforme configuração.
 - Vencimento, cancelamento parcial e estorno: vendedor.
+
+Telefones são normalizados para DDI 55. Destinatários sem telefone ou com
+número brasileiro inválido não geram `WhatsAppMessage` nem
+`NotificationOutbox`.
+
+## Política do cadastro de empresa
+
+A emissão mais recente atualiza o cadastro corrente de `Company` para o CNPJ
+(política A). Cada boleto guarda uma cópia própria em `company_snapshot`;
+atualizações posteriores da empresa não alteram o histórico dos boletos já
+emitidos.
 
 ## Configuração
 

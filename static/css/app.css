@@ -1265,3 +1265,13 @@ html{background:#071b4a;scroll-behavior:smooth}body.seller-app{background:var(--
     .app-auth-card p { margin: 8px 0 20px; font-size: .76rem; }
     .app-auth-card .btn-primary,.app-auth-card__button { width: 100%; min-height: 48px; justify-content: center; }
 }
+
+/* Five primary destinations share the seller navigation without overflow. */
+.seller-app .nav__inner {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.seller-app .nav a {
+    min-width: 0;
+    padding-inline: 2px;
+}

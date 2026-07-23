@@ -10,7 +10,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.boletos.models import Boleto, BoletoStatus, Company
-from apps.sellers.models import Seller
+from apps.boletos.services.webhook_processing import ALLOWED_TRANSITIONS
+from apps.notifications.models import NotificationOutbox, WhatsAppMessage
+from apps.sellers.models import Selle
 from apps.webhooks.models import ProcessingStatus, WebhookEvent
 from apps.webhooks.pagarme_payload import normalize_event
 from apps.webhooks.processor import process_webhook_event
@@ -88,7 +90,6 @@ def _event(payload):
         ("order.paid", BoletoStatus.PAID, "paid_at"),
         ("order.payment_failed", BoletoStatus.FAILED, "failed_at"),
         ("order.canceled", BoletoStatus.CANCELED, "canceled_at"),
-        ("order.closed", BoletoStatus.EXPIRED, "expired_at"),
     ],
 )
 def test_order_event_updates_boleto_and_audit_link(
@@ -175,6 +176,137 @@ def test_creation_unknown_is_reconciled_from_webhook_metadata(boleto):
     assert boleto.provider_order_id == "or_boleto_1"
     assert boleto.provider_charge_id == "ch_boleto_1"
     assert boleto.provider_transaction_id == "tran_boleto_1"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("provider_status", "expected_status"),
+    [
+        ("paid", BoletoStatus.PAID),
+        ("canceled", BoletoStatus.CANCELED),
+        ("expired", BoletoStatus.EXPIRED),
+        ("failed", BoletoStatus.FAILED),
+    ],
+)
+def test_order_closed_uses_explicit_nested_status(boleto, provider_status, expected_status):
+    payload = _payload(boleto, "order.closed", status="closed")
+    payload["data"]["charges"][0]["status"] = provider_status
+    event = _event(payload)
+
+    assert process_webhook_event(event)
+
+    boleto.refresh_from_db()
+    event.refresh_from_db()
+    assert boleto.status == expected_status
+    assert event.processing_status == ProcessingStatus.PROCESSED
+
+
+@pytest.mark.django_db
+def test_order_closed_inconclusive_is_ignored_without_notification(boleto):
+    event = _event(_payload(boleto, "order.closed", status="closed"))
+
+    assert process_webhook_event(event)
+
+    boleto.refresh_from_db()
+    event.refresh_from_db()
+    assert boleto.status == BoletoStatus.PENDING
+    assert event.processing_status == ProcessingStatus.IGNORED
+    assert not NotificationOutbox.objects.exists()
+    assert not WhatsAppMessage.objects.exists()
+
+
+@pytest.mark.django_db
+def test_order_closed_does_not_regress_final_state(boleto):
+    boleto.status = BoletoStatus.PAID
+    boleto.save(update_fields=["status", "updated_at"])
+    payload = _payload(boleto, "order.closed", status="closed")
+    payload["data"]["charges"][0]["status"] = "expired"
+    event = _event(payload)
+
+    assert process_webhook_event(event)
+
+    boleto.refresh_from_db()
+    event.refresh_from_db()
+    assert boleto.status == BoletoStatus.PAID
+    assert event.processing_status == ProcessingStatus.IGNORED
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("field", "payload_path", "conflicting_value"),
+    [
+        ("provider_charge_id", ("charges", 0, "id"), "ch_conflict"),
+        ("provider_order_id", ("order", "id"), "or_conflict"),
+        (
+            "provider_transaction_id",
+            ("charges", 0, "last_transaction", "id"),
+            "tran_conflict",
+        ),
+    ],
+)
+def test_internal_id_rejects_conflicting_provider_ids(
+    boleto,
+    field,
+    payload_path,
+    conflicting_value,
+):
+    payload = _payload(boleto, "order.paid")
+    target = payload["data"]
+    for key in payload_path[:-1]:
+        target = target[key]
+    target[payload_path[-1]] = conflicting_value
+    event = _event(payload)
+
+    assert not process_webhook_event(event)
+
+    boleto.refresh_from_db()
+    event.refresh_from_db()
+    assert boleto.status == BoletoStatus.PENDING
+    assert getattr(boleto, field) != conflicting_value
+    assert event.processing_status == ProcessingStatus.FAILED
+    assert event.error_code == "BOLETO_PROVIDER_ID_MISMATCH"
+    assert event.error_detail == ""
+    assert not NotificationOutbox.objects.exists()
+    assert not WhatsAppMessage.objects.exists()
+
+
+@pytest.mark.django_db
+def test_internal_id_rejects_charge_owned_by_another_boleto(boleto):
+    other = Boleto.objects.create(
+        seller=boleto.seller,
+        company=boleto.company,
+        created_by_seller=boleto.seller,
+        amount_cents=10_000,
+        due_date=boleto.due_date,
+        description="Outra cobrança",
+        status=BoletoStatus.PENDING,
+        idempotency_key="other-provider-owner",
+        provider_order_id="or_other",
+        provider_charge_id="ch_other",
+        company_snapshot={},
+    )
+    boleto.provider_charge_id = None
+    boleto.save(update_fields=["provider_charge_id", "updated_at"])
+    payload = _payload(boleto, "order.paid")
+    payload["data"]["charges"][0]["id"] = other.provider_charge_id
+    event = _event(payload)
+
+    assert not process_webhook_event(event)
+
+    boleto.refresh_from_db()
+    event.refresh_from_db()
+    assert boleto.provider_charge_id is None
+    assert boleto.status == BoletoStatus.PENDING
+    assert event.error_code == "BOLETO_PROVIDER_ID_MISMATCH"
+
+
+def test_state_machine_uses_explicit_transition_sets():
+    assert BoletoStatus.REFUNDED not in ALLOWED_TRANSITIONS[BoletoStatus.CREATING]
+    assert BoletoStatus.PARTIALLY_CANCELED not in ALLOWED_TRANSITIONS[
+        BoletoStatus.CREATION_UNKNOWN
+    ]
+    assert BoletoStatus.PAID in ALLOWED_TRANSITIONS[BoletoStatus.CREATION_UNKNOWN]
+    assert BoletoStatus.PAID in ALLOWED_TRANSITIONS[BoletoStatus.EXPIRED]
 
 
 @pytest.mark.django_db

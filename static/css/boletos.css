@@ -603,3 +603,82 @@
         width: 100%;
     }
 }
+
+/* Manager list: compact, deliberate hierarchy instead of a loose card mosaic. */
+@media (min-width: 1024px) {
+    .boleto-metrics {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .boleto-metric:nth-child(n + 5) {
+        grid-column: span 2;
+    }
+
+    .boleto-list {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-body .boleto-list-card {
+        display: grid;
+        grid-template-columns: minmax(240px, 1.5fr) minmax(140px, .55fr) minmax(270px, 1fr) auto;
+        align-items: center;
+        gap: var(--space-5);
+        padding: var(--space-4) var(--space-5);
+    }
+
+    .admin-body .boleto-list-card__amount {
+        margin: 0;
+        font-size: var(--text-xl);
+    }
+
+    .admin-body .boleto-list-card__meta {
+        margin: 0;
+    }
+
+    .admin-body .boleto-list-card__action {
+        min-width: 112px;
+        margin: 0;
+        border: 0;
+        border-radius: var(--radius-md);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-gray-100);
+    }
+}
+
+.boleto-list-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    margin: var(--space-5) 0 var(--space-3);
+}
+
+.boleto-list-heading h2 {
+    margin: 0;
+    color: var(--vidalys-navy);
+    font-size: var(--text-lg);
+    letter-spacing: -.02em;
+}
+
+.boleto-list-heading p {
+    margin: 3px 0 0;
+    color: var(--color-gray-500);
+    font-size: var(--text-xs);
+}
+
+.boleto-filters--seller {
+    padding: var(--space-3);
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .boleto-metrics {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .boleto-metric--value {
+        grid-column: span 2;
+    }
+
+    .boleto-list {
+        grid-template-columns: 1fr;
+    }
+}

@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.boletos.models import Boleto, BoletoStatus, Company
 from apps.notifications.models import WhatsAppMessage
-from apps.sellers.models import Seller
+from apps.sellers.models import Selle
 from apps.webhooks.models import WebhookEvent
 
 
@@ -125,7 +125,7 @@ def test_manager_list_filters_searches_orders_and_paginates(
 
 
 @pytest.mark.django_db
-def test_seller_list_is_scoped_and_has_own_metrics(client, sellers, companies):
+def test_seller_list_is_scoped_without_metrics(client, sellers, companies):
     own = make_boleto(
         seller=sellers[0],
         company=companies[0],
@@ -144,8 +144,8 @@ def test_seller_list_is_scoped_and_has_own_metrics(client, sellers, companies):
 
     assert response.status_code == 200
     assert list(response.context["boletos"]) == [own]
-    assert response.context["metrics"]["paid"] == 1
-    assert response.context["metrics"]["pending"] == 0
+    assert "metrics" not in response.context
+    assert b"boleto-metrics" not in response.content
     assert b"<dt>Vendedor</dt>" not in response.content
 
 

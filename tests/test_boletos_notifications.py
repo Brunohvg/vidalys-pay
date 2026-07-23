@@ -15,7 +15,7 @@ from apps.notifications.whatsapp_service import (
     queue_boleto_created,
     queue_boleto_status,
 )
-from apps.sellers.models import Seller
+from apps.sellers.models import Selle
 from apps.webhooks.models import WebhookEvent
 from apps.webhooks.processor import process_webhook_event
 
@@ -156,3 +156,64 @@ def test_webhook_queues_notification_only_after_commit(
 
     process_webhook_event(event)
     assert NotificationOutbox.objects.count() == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("seller_phone", "expected_status"),
+    [
+        ("", "missing_phone"),
+        ("123", "invalid_phone"),
+    ],
+)
+def test_invalid_or_missing_seller_phone_never_creates_outbox(
+    boleto,
+    seller_phone,
+    expected_status,
+):
+    boleto.seller.whatsapp_phone = seller_phone
+    boleto.seller.save(update_fields=["whatsapp_phone", "updated_at"])
+    boleto.company_snapshot["whatsapp_phone"] = ""
+    boleto.company_snapshot["phone"] = ""
+    boleto.save(update_fields=["company_snapshot", "updated_at"])
+
+    results = queue_boleto_created(boleto=boleto)
+
+    assert results[0].status == expected_status
+    assert results[1].status == "missing_phone"
+    assert not NotificationOutbox.objects.exists()
+    assert not WhatsAppMessage.objects.exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("phone", ["11999999999", "5511999999999"])
+def test_valid_phone_is_normalized_once_to_country_code(boleto, phone):
+    boleto.seller.whatsapp_phone = phone
+    boleto.seller.save(update_fields=["whatsapp_phone", "updated_at"])
+    boleto.company_snapshot["whatsapp_phone"] = ""
+    boleto.company_snapshot["phone"] = ""
+    boleto.save(update_fields=["company_snapshot", "updated_at"])
+
+    results = queue_boleto_created(boleto=boleto)
+
+    assert results[0].status == "queued"
+    assert results[0].recipient_phone == "5511999999999"
+    assert WhatsAppMessage.objects.get().recipient_phone == "5511999999999"
+
+
+@pytest.mark.django_db
+def test_invalid_manager_phone_never_creates_outbox(settings, boleto):
+    settings.BOLETO_MANAGER_WHATSAPP_PHONES = ["invalid", "55123"]
+    settings.BOLETO_NOTIFY_CUSTOMER_ON_PAID = False
+    boleto.seller.whatsapp_phone = ""
+    boleto.seller.save(update_fields=["whatsapp_phone", "updated_at"])
+
+    results = queue_boleto_status(boleto=boleto, event_type="boleto_paid")
+
+    assert [result.status for result in results] == [
+        "missing_phone",
+        "invalid_phone",
+        "invalid_phone",
+    ]
+    assert not NotificationOutbox.objects.exists()
+    assert not WhatsAppMessage.objects.exists()
