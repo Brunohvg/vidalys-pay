@@ -1,21 +1,17 @@
 """Company and boleto domain models."""
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django.db import models
 
 from apps.core.models import TimeStampedModel, UUIDModel
 
-cnpj_validator = RegexValidator(
-    regex=r"^\d{14}$",
-    message="O CNPJ deve conter exatamente 14 dígitos, sem máscara.",
-)
+from .validators import normalize_cnpj, validate_cnpj
 
 
 class Company(UUIDModel, TimeStampedModel):
     """Pessoa jurídica sacada, identificada globalmente pelo CNPJ normalizado."""
 
-    cnpj = models.CharField(max_length=14, unique=True, validators=[cnpj_validator])
+    cnpj = models.CharField(max_length=14, unique=True, validators=[validate_cnpj])
     legal_name = models.CharField(max_length=200)
     trade_name = models.CharField(max_length=200, blank=True, default="")
     registration_status = models.CharField(max_length=40, blank=True, default="")
@@ -39,6 +35,20 @@ class Company(UUIDModel, TimeStampedModel):
 
     def __str__(self):
         return f"{self.legal_name} ({self.cnpj})"
+
+    def clean(self):
+        super().clean()
+        self.cnpj = normalize_cnpj(self.cnpj)
+        validate_cnpj(self.cnpj)
+
+    def full_clean(self, *args, **kwargs):
+        self.cnpj = normalize_cnpj(self.cnpj)
+        return super().full_clean(*args, **kwargs)
+
+    def save(self, *args, **kwargs):
+        self.cnpj = normalize_cnpj(self.cnpj)
+        validate_cnpj(self.cnpj)
+        return super().save(*args, **kwargs)
 
 
 class BoletoStatus(models.TextChoices):

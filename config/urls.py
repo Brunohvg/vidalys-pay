@@ -8,6 +8,7 @@ urlpatterns = [
     path("health/", include("apps.core.urls_health")),
     path("", include("apps.sellers.urls")),
     path("api/v1/", include("apps.payment_links.urls_api")),
+    path("api/v1/", include("apps.boletos.urls_api")),
     path("api/v1/", include("apps.freight.urls_api")),
     path("api/v1/webhooks/", include("apps.webhooks.urls")),
 ]
