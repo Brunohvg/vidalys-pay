@@ -1,5 +1,5 @@
 /* Vidalys Pay â€” Service Worker v4 */
-const CACHE_NAME = 'vidalys-pay-v13';
+const CACHE_NAME = 'vidalys-pay-v14';
 const STATIC_ASSETS = [
   '/static/css/tokens.css',
   '/static/css/app.css',
