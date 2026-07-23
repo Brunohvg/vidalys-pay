@@ -51,9 +51,19 @@ class PagarmeClient:
             "Authorization": build_basic_auth_header(self.api_key),
         }
 
-    def _post(self, path: str, json: dict) -> dict[str, Any]:
+    def _post(
+        self,
+        path: str,
+        json: dict,
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = self._headers()
+        extra_headers = extra_headers or {}
+        if any(key.lower() == "authorization" for key in extra_headers):
+            raise ValueError("O header Authorization não pode ser sobrescrito.")
+        headers.update(extra_headers)
         _log_request_diagnostics("POST", url, headers)
         response = httpx.post(url, json=json, headers=headers, timeout=self._timeout)
         return self._handle_response(response)
@@ -167,6 +177,54 @@ class PagarmeClient:
             timeout=self._timeout,
         )
         return self._handle_response(response)
+
+    def create_boleto_order(
+        self,
+        *,
+        code: str,
+        amount_cents: int,
+        description: str,
+        due_date: str,
+        customer: dict[str, Any],
+        metadata: dict[str, str],
+        idempotency_key: str,
+        instructions: str = "",
+    ) -> dict[str, Any]:
+        """Create a Pagar.me V5 order paid by boleto."""
+        boleto: dict[str, Any] = {"due_at": f"{due_date}T23:59:59Z"}
+        if instructions:
+            boleto["instructions"] = instructions[:255]
+
+        payload = {
+            "code": code,
+            "customer": customer,
+            "items": [
+                {
+                    "amount": amount_cents,
+                    "description": description[:255],
+                    "quantity": 1,
+                    "code": code,
+                }
+            ],
+            "payments": [
+                {
+                    "payment_method": "boleto",
+                    "boleto": boleto,
+                }
+            ],
+            "metadata": metadata,
+        }
+
+        logger.info(
+            "Criando boleto Pagar.me: code=%s amount=%d",
+            code,
+            amount_cents,
+        )
+        return self._post(
+            "orders",
+            payload,
+            extra_headers={"Idempotency-Key": idempotency_key},
+        )
 
 
 def get_client() -> PagarmeClient:

@@ -29,6 +29,7 @@ class NormalizedEvent:
     charge_id: str | None = None
     transaction_id: str | None = None
     internal_payment_link_id: str | None = None
+    internal_boleto_id: str | None = None
     status: str | None = None
     amount_cents: int | None = None
     installments: int | None = None
@@ -58,6 +59,7 @@ def normalize_event(payload: dict[str, Any]) -> NormalizedEvent:
         charge_id=_extract_charge_id(data),
         transaction_id=_extract_transaction_id(data),
         internal_payment_link_id=_extract_internal_id(data),
+        internal_boleto_id=_extract_metadata_value(data, "internal_boleto_id"),
         status=data.get("status", ""),
         amount_cents=_extract_amount(data),
         installments=_extract_installments(data),
@@ -115,6 +117,27 @@ def _extract_internal_id(data: dict) -> str | None:
             iid = charge_meta.get("internal_payment_link_id", "")
             return iid or None
 
+    return None
+
+
+def _extract_metadata_value(data: dict, key: str) -> str | None:
+    """Read metadata consistently from order, charge or nested order payloads."""
+    nested_order = data.get("order", {})
+    if not isinstance(nested_order, dict):
+        nested_order = {}
+    candidates = [
+        data.get("metadata", {}),
+        nested_order.get("metadata", {}),
+    ]
+    charge = _get_first_charge(data)
+    if charge:
+        candidates.append(charge.get("metadata", {}))
+
+    for metadata in candidates:
+        if isinstance(metadata, dict):
+            value = metadata.get(key)
+            if value:
+                return str(value)
     return None
 
 
