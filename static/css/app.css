@@ -1208,3 +1208,60 @@ html{background:#071b4a;scroll-behavior:smooth}body.seller-app{background:var(--
     .create-link-value { padding-bottom: 10px; }
     .create-link-optional__toggle { min-height: 48px; }
 }
+
+/* Full mobile audit: readability, safe areas, keyboard and secondary states. */
+@media (max-width: 767px) {
+    .seller-app .content {
+        padding-left: max(14px, env(safe-area-inset-left, 0px));
+        padding-right: max(14px, env(safe-area-inset-right, 0px));
+        scroll-padding: 12px 0 96px;
+    }
+    .seller-app .nav {
+        padding-left: max(8px, env(safe-area-inset-left, 0px));
+        padding-right: max(8px, env(safe-area-inset-right, 0px));
+    }
+    .seller-app .app-page-heading h1 { font-weight: 700; }
+    .seller-app .app-page-heading__eyebrow { min-height: 12px; font-size: .625rem; }
+    .seller-app .app-page-heading p { font-size: .75rem; }
+    .history-search input { font-size: 1rem; }
+    .history-summary__item span,.create-link-secure,.profile-modern-action small { font-size: .625rem; }
+    .history-card__reference,.history-card__meta,.profile-overview span,.profile-modern-card > header { font-size: .625rem; }
+    .profile-detail span,.profile-overview p,.freight-results__heading { font-size: .6875rem; }
+    .profile-detail strong,.profile-modern-action strong,.history-card__identity strong { font-size: .75rem; }
+    .create-link-value__input input { font-weight: 700; }
+
+    .success-modern { padding: 8px 0 18px; text-align: center; }
+    .success-modern__icon { display: grid; place-items: center; width: 54px; height: 54px; margin: 0 auto 12px; border-radius: 18px; background: #eafbf5; color: #16836c; font-size: 1.35rem; font-weight: 700; box-shadow: inset 0 0 0 1px #c9f0e2; }
+    .success-modern__label { color: #667085; font-size: .72rem; }
+    .success-modern__amount { display: block; margin-top: 2px; color: var(--vidalys-navy); font-size: clamp(2rem, 11vw, 2.8rem); line-height: 1.12; letter-spacing: -.055em; font-variant-numeric: tabular-nums; }
+    .success-modern__meta { display: block; margin-top: 4px; color: #7c8799; font-size: .68rem; }
+    .success-modern__delivery { max-width: 340px; margin: 15px auto 0; padding: 10px 12px; border: 1px solid var(--app-line); border-radius: 13px; background: #fff; }
+    .success-modern__delivery .whatsapp-status { justify-content: flex-start; margin: 0; font-size: .68rem; text-align: left; }
+    .success-modern__delivery .whatsapp-status + .whatsapp-status { margin-top: 7px; }
+    .success-modern__actions { display: grid; gap: 7px; max-width: 380px; margin: 15px auto 0; }
+    .success-modern__actions .btn-primary,.success-modern__actions .btn-secondary { min-height: 47px; }
+    .success-modern__resend { min-height: 44px; border: 0; border-radius: 11px; background: transparent; color: #16836c; font: 650 .72rem var(--font-sans); cursor: pointer; }
+    .success-modern__new { display: inline-flex; min-height: 44px; align-items: center; margin-top: 6px; color: #175cd3; font-size: .7rem; font-weight: 650; text-decoration: none; }
+}
+
+@media (max-width: 767px) and (orientation: landscape) and (max-height: 500px) {
+    .seller-app .header { min-height: calc(48px + env(safe-area-inset-top)); }
+    .seller-app .header__inner { height: 48px; }
+    .seller-app .app-page-heading__eyebrow { display: none; }
+    .seller-app .app-page-heading p { display: none; }
+    .seller-app .app-page-heading { margin-bottom: 7px; }
+    .seller-app .content { padding-top: 8px; }
+}
+
+@media (max-width: 600px) {
+    body.app-auth-page {
+        min-height: 100svh;
+        padding: max(18px, env(safe-area-inset-top, 0px)) max(15px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(15px, env(safe-area-inset-left, 0px));
+    }
+    .app-auth-card { padding: 27px 20px; border-radius: 18px; }
+    .app-auth-card__brand { margin-bottom: 22px; }
+    .app-auth-card__icon { width: 56px; height: 56px; margin-bottom: 16px; border-radius: 17px; }
+    .app-auth-card h1 { font-size: 1.22rem; line-height: 1.18; }
+    .app-auth-card p { margin: 8px 0 20px; font-size: .76rem; }
+    .app-auth-card .btn-primary,.app-auth-card__button { width: 100%; min-height: 48px; justify-content: center; }
+}

@@ -39,7 +39,7 @@
                 </a>
                 <div class="header__user">
                     <span class="header__status" id="connectionStatus">Online</span>
-                    <span class="header__avatar" aria-hidden="true">{{ seller.name|slice:":1"|upper }}</span>
+                    <span class="header__avatar" role="img" aria-label="Conta de {{ seller.name }}" title="{{ seller.name }}">{{ seller.name|slice:":1"|upper }}</span>
                 </div>
             </div>
         </header>

@@ -20,6 +20,9 @@
   width: 100%;
   box-shadow: var(--shadow-lg);
   animation: pwaSlideUp 0.25s ease-out;
+  max-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 @keyframes pwaSlideUp {
@@ -131,6 +134,9 @@ body.push-onboarding-open {
   text-align: center;
   transform: translateY(105%);
   transition: transform 260ms cubic-bezier(.2, .8, .2, 1);
+  max-height: calc(100dvh - max(16px, env(safe-area-inset-top, 0px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .push-onboarding.is-visible .push-onboarding__backdrop { opacity: 1; }

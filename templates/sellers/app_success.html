@@ -1,56 +1,35 @@
 ﻿{% extends "sellers/app_base.html" %}
 {% load formatting %}
 {% block title %}Link criado — Vidalys Pay{% endblock %}
+{% block greeting %}<span class="app-page-heading__eyebrow">Tudo pronto</span>{% endblock %}
 {% block page_title %}Cobrança criada{% endblock %}
-{% block page_description %}<p>Compartilhe o link ou acompanhe o envio pelo WhatsApp.</p>{% endblock %}
+{% block page_description %}<p>Compartilhe agora ou acompanhe o envio automático.</p>{% endblock %}
 
 {% block content %}
 {% if link %}
-<div class="success-screen">
-    <div class="success-icon">✓</div>
+<section class="success-modern">
+    <div class="success-modern__icon" aria-hidden="true">✓</div>
+    <p class="success-modern__label">Link criado com sucesso</p>
+    <strong class="success-modern__amount">{{ link.amount_cents|format_brl }}</strong>
+    <span class="success-modern__meta">{{ link.installments }}x sem juros · {{ link.reference }}</span>
 
-    <h2 style="font-size: var(--text-xl); font-weight: 700; color: var(--color-navy-900); margin-bottom: var(--space-2);">Link criado com sucesso!</h2>
-    <p style="font-size: var(--text-sm); color: var(--color-gray-500); margin-bottom: var(--space-6);">Seu link de pagamento está pronto para ser compartilhado.</p>
-
-    <div class="success-amount">{{ link.amount_cents|format_brl }}</div>
-    <div class="success-installments">{{ link.installments }}x sem juros · {{ link.reference }}</div>
-
-    <div id="whatsappStatuses" style="margin-top: var(--space-4); width: 100%; max-width: 320px; margin-inline: auto;">
-        <div class="whatsapp-status" id="whatsappSeller">
-            <span class="dot dot--sending"></span>
-            <span>Enviando link para seu WhatsApp...</span>
-        </div>
-        {% if link.customer_phone %}
-        <div class="whatsapp-status" id="whatsappCustomer" style="margin-top: var(--space-2);">
-            <span class="dot dot--sending"></span>
-            <span>Enviando link para o cliente...</span>
-        </div>
-        {% endif %}
+    <div class="success-modern__delivery" id="whatsappStatuses" aria-live="polite">
+        <div class="whatsapp-status" id="whatsappSeller"><span class="dot dot--sending"></span><span>Enviando para seu WhatsApp...</span></div>
+        {% if link.customer_phone %}<div class="whatsapp-status" id="whatsappCustomer"><span class="dot dot--sending"></span><span>Enviando para o cliente...</span></div>{% endif %}
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-6); max-width: 320px; margin-inline: auto;">
-        <button class="btn-primary" onclick="shareLink('{{ link.payment_url }}', '{{ link.reference }}')">
-            Compartilhar link
-        </button>
-        <button class="btn-secondary" onclick="copyLink('{{ link.payment_url }}')">
-            Copiar link
-        </button>
-        <button class="btn-whatsapp" onclick="resendLink('{{ link.id }}')">
-            Reenviar via WhatsApp
-        </button>
+    <div class="success-modern__actions">
+        <button class="btn-primary" type="button" onclick="shareLink('{{ link.payment_url|escapejs }}', '{{ link.reference|escapejs }}')">Compartilhar link</button>
+        <button class="btn-secondary" type="button" onclick="copyLink('{{ link.payment_url|escapejs }}')">Copiar link</button>
+        <button class="success-modern__resend" type="button" onclick="resendLink('{{ link.id }}')">Reenviar pelo WhatsApp</button>
     </div>
-
-    <div style="margin-top: var(--space-6);">
-        <a href="/app/" style="color: var(--color-blue-600); font-size: var(--text-sm); font-weight: 600; text-decoration: none;">
-            Criar outro link
-        </a>
-    </div>
-</div>
+    <a class="success-modern__new" href="/app/">Criar outra cobrança</a>
+</section>
 {% else %}
-<div class="empty-state">
-    <div class="empty-state__icon">?</div>
-    <p class="empty-state__text">Link não encontrado.</p>
-    <a href="/app/" class="btn-primary" style="width: auto; display: inline-flex; padding: var(--space-3) var(--space-6);">Criar novo link</a>
+<div class="empty-state history-empty">
+    <div class="empty-state__icon">?</div><h2>Link não encontrado</h2>
+    <p class="empty-state__text">Esta cobrança não está disponível ou não pertence a este acesso.</p>
+    <a href="/app/" class="btn-primary history-empty__action">Criar novo link</a>
 </div>
 {% endif %}
 {% endblock %}
@@ -58,97 +37,13 @@
 {% block scripts %}
 <script>
 {% if link %}
-// Poll WhatsApp status from the API
-async function checkWhatsAppStatus() {
-    try {
-        const response = await fetch('/api/v1/payment-links/{{ link.id }}/', {
-            headers: { 'Accept': 'application/json' },
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        const messages = data.data?.whatsapp_messages || [];
-        updateStatusDisplay(messages);
-    } catch {}
-}
-
-function updateStatusDisplay(messages) {
-    messages.forEach(msg => {
-        if (msg.recipient_type === 'seller') {
-            const el = document.getElementById('whatsappSeller');
-            if (el) el.innerHTML = getStatusHtml(msg.status, 'Seu WhatsApp');
-        }
-        if (msg.recipient_type === 'customer') {
-            const el = document.getElementById('whatsappCustomer');
-            if (el) el.innerHTML = getStatusHtml(msg.status, 'o cliente');
-        }
-    });
-}
-
-function getStatusHtml(status, target) {
-    switch (status) {
-        case 'SENT':
-            return '<span class="dot dot--sent"></span><span>Link enviado para ' + target + '</span>';
-        case 'SENDING':
-            return '<span class="dot dot--sending"></span><span>Enviando link para ' + target + '...</span>';
-        case 'FAILED':
-        case 'DEAD':
-            return '<span class="dot dot--error"></span><span>Falha ao enviar para ' + target + '</span>';
-        case 'QUEUED':
-        default:
-            return '<span class="dot dot--sending"></span><span>Aguardando envio para ' + target + '...</span>';
-    }
-}
-
-// Check status periodically
-checkWhatsAppStatus();
-const statusInterval = setInterval(checkWhatsAppStatus, 3000);
-// Stop polling after 2 minutes
-setTimeout(() => clearInterval(statusInterval), 120000);
+async function checkWhatsAppStatus() { try { var response=await fetch('/api/v1/payment-links/{{ link.id }}/',{headers:{'Accept':'application/json'}}); if(!response.ok)return; var data=await response.json(); updateStatusDisplay(data.data?.whatsapp_messages||[]); } catch(_){} }
+function updateStatusDisplay(messages) { messages.forEach(function(message) { var target=message.recipient_type==='seller'?'Seu WhatsApp':message.recipient_type==='customer'?'o cliente':null; var element=message.recipient_type==='seller'?document.getElementById('whatsappSeller'):document.getElementById('whatsappCustomer'); if(element&&target)element.innerHTML=getStatusHtml(message.status,target); }); }
+function getStatusHtml(status,target) { if(status==='SENT')return '<span class="dot dot--sent"></span><span>Link enviado para '+target+'</span>'; if(status==='FAILED'||status==='DEAD')return '<span class="dot dot--failed"></span><span>Falha ao enviar para '+target+'</span>'; return '<span class="dot dot--sending"></span><span>Enviando link para '+target+'...</span>'; }
+checkWhatsAppStatus(); var statusInterval=setInterval(checkWhatsAppStatus,3000); setTimeout(function(){clearInterval(statusInterval);},120000);
 {% endif %}
-
-async function copyLink(url) {
-    try {
-        await navigator.clipboard.writeText(url);
-        showToast('Link copiado!', 'success');
-    } catch {
-        showToast('Não foi possível copiar', 'error');
-    }
-}
-
-async function shareLink(url, reference) {
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: 'Link de pagamento - ' + reference,
-                text: 'Link de pagamento para pedido ' + reference,
-                url: url,
-            });
-        } catch {}
-    } else {
-        copyLink(url);
-    }
-}
-
-async function resendLink(linkId) {
-    try {
-        const response = await fetch('/api/v1/payment-links/' + linkId + '/resend/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
-                'Idempotency-Key': crypto.randomUUID(),
-                'Accept': 'application/json',
-            },
-        });
-        if (response.ok) {
-            showToast('Link reenviado!', 'success');
-            // Refresh status display
-            checkWhatsAppStatus();
-        } else {
-            showToast('Erro ao reenviar', 'error');
-        }
-    } catch {
-        showToast('Erro de conexão', 'error');
-    }
-}
+async function copyLink(url) { try { await navigator.clipboard.writeText(url); showToast('Link copiado!','success'); } catch(_){ showToast('Não foi possível copiar','error'); } }
+async function shareLink(url,reference) { if(navigator.share){try{await navigator.share({title:'Link de pagamento - '+reference,text:'Link de pagamento para '+reference,url:url});}catch(_){}}else copyLink(url); }
+async function resendLink(linkId) { try { var response=await fetch('/api/v1/payment-links/'+linkId+'/resend/',{method:'POST',headers:{'X-CSRFToken':getCsrfToken(),'Idempotency-Key':crypto.randomUUID(),'Accept':'application/json'}}); showToast(response.ok?'Link reenviado!':'Erro ao reenviar',response.ok?'success':'error'); if(response.ok)checkWhatsAppStatus(); } catch(_){showToast('Erro de conexão','error');} }
 </script>
 {% endblock %}
