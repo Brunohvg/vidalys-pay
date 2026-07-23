@@ -105,7 +105,7 @@ def test_manager_list_filters_searches_orders_and_paginates(
     no_match = client.get(reverse("boletos:manager_list"), {"q": "INEXISTENTE"})
     malformed = client.get(
         reverse("boletos:manager_list"),
-        {"seller": "invalid", "created_from": "not-a-date"},
+        {"seller": "invalid", "created_from": "2026-99-99"},
     )
 
     assert first_page.status_code == 200

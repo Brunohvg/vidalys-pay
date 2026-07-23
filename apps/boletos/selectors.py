@@ -94,13 +94,13 @@ def _apply_filters(queryset, params):
     if seller_id:
         queryset = queryset.filter(seller_id=seller_id)
 
-    created_from = parse_date(params.get("created_from", "").strip())
+    created_from = _safe_date(params.get("created_from", "").strip())
     if created_from:
         queryset = queryset.filter(created_at__date__gte=created_from)
-    created_to = parse_date(params.get("created_to", "").strip())
+    created_to = _safe_date(params.get("created_to", "").strip())
     if created_to:
         queryset = queryset.filter(created_at__date__lte=created_to)
-    due_date = parse_date(params.get("due_date", "").strip())
+    due_date = _safe_date(params.get("due_date", "").strip())
     if due_date:
         queryset = queryset.filter(due_date=due_date)
     return queryset
@@ -108,3 +108,10 @@ def _apply_filters(queryset, params):
 
 def _digits(value: str) -> str:
     return "".join(character for character in value if character.isdigit())
+
+
+def _safe_date(value: str):
+    try:
+        return parse_date(value)
+    except ValueError:
+        return None
