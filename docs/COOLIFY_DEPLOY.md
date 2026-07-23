@@ -90,6 +90,16 @@ O Coolify detectará automaticamente dois serviços:
 1. **web** — Servidor principal (Gunicorn)
 2. **worker** — Worker de notificações
 
+### Rede validada neste ambiente
+
+Tanto `docker-compose.yml` quanto `docker-compose.production.yml` conectam
+`web` e `worker` à rede externa `coolify`. Essa configuração foi mantida porque
+é a que permite resolver a Internal URL do PostgreSQL nesta instalação.
+
+Não remova `networks: [coolify]` nem o bloco `external: true` sem uma migração
+de rede planejada. Alternar o arquivo Compose é seguro somente enquanto essa
+configuração permanecer idêntica nos dois arquivos.
+
 ### 4. Configurar Domínio
 
 1. No serviço **web**, vá em "Networking"
@@ -200,9 +210,10 @@ Antes do deploy, você precisa:
 
 ### Erro de Conexão com Banco
 
-- Verificar `DATABASE_URL`
-- Verificar se o PostgreSQL está acessível
-- Verificar firewall
+- Verificar se `DATABASE_URL` ainda é a Internal URL atual do PostgreSQL
+- Confirmar que `web`, `worker` e PostgreSQL estão conectados à rede `coolify`
+- Confirmar que o Compose selecionado contém `external: true`
+- Verificar se o PostgreSQL está acessível e se não houve recriação do recurso
 
 ### Webhook não funciona
 

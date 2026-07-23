@@ -270,7 +270,10 @@ curl -s https://pay.vidalys.com.br/health/ready/
 - **Nunca** use `localhost` como host do banco de dados
 - **Nunca** defina `DB_HOST`, `DB_PORT`, `POSTGRES_USER` — use apenas `DATABASE_URL`
 - O banco PostgreSQL é externo, gerenciado pelo Coolify
-- A rede `coolify` deve ser externa (`external: true`) no compose
+- A rede `coolify` deve ser externa (`external: true`) nos arquivos
+  `docker-compose.yml` e `docker-compose.production.yml`
+- A configuração de rede foi validada no ambiente atual; não alterne o arquivo
+  Compose no Coolify sem confirmar que ambos continuam equivalentes
 
 Veja `RUNBOOK.md` para procedimentos operacionais.
 O fluxo completo de boletos está documentado em [`docs/BOLETOS.md`](docs/BOLETOS.md).

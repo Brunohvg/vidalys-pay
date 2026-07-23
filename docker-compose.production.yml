@@ -76,6 +76,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    networks:
+      - coolify
 
   worker:
     build:
@@ -90,3 +92,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true

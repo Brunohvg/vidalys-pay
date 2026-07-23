@@ -216,6 +216,29 @@ curl -s https://pay.vidalys.com.br/health/ready/
 
 ## Deploy
 
+### Contrato de rede do Coolify
+
+O ambiente atual usa a rede externa `coolify`. Os dois arquivos de produção,
+`docker-compose.yml` e `docker-compose.production.yml`, devem manter:
+
+```yaml
+services:
+  web:
+    networks:
+      - coolify
+  worker:
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true
+```
+
+Se o deploy parar em `failed to resolve host`, confirme primeiro o arquivo
+Compose selecionado e a presença dessa rede. Não troque para rede gerenciada
+sem validar previamente a resolução da Internal URL do PostgreSQL.
+
 ### Setup inicial (Coolify)
 
 1. Conectar repositório Git
