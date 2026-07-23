@@ -86,10 +86,10 @@ def make_boleto(*, company, seller, idempotency_key, manager=None, creator_selle
     )
 
 
-def test_company_requires_normalized_cnpj():
+def test_company_normalizes_cnpj_before_validation():
     company = Company(
         cnpj="11.222.333/0001-81",
-        legal_name="Empresa Inválida",
+        legal_name="Empresa Normalizada",
         zip_code="01310100",
         street="Avenida Paulista",
         number="1000",
@@ -98,8 +98,9 @@ def test_company_requires_normalized_cnpj():
         state="SP",
     )
 
-    with pytest.raises(ValidationError, match="14 dígitos"):
-        company.full_clean()
+    company.full_clean()
+
+    assert company.cnpj == "11222333000181"
 
 
 def test_company_cnpj_is_globally_unique(company):
