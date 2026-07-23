@@ -209,6 +209,15 @@ Consulte [`docs/API.md`](docs/API.md) para exemplos, autenticação, escopos,
 idempotência e erros. O contrato OpenAPI 3.1 está em
 [`docs/openapi.json`](docs/openapi.json).
 
+### Documentação online da API
+
+- `/api/docs/` — Swagger UI para explorar o contrato;
+- `/api/redoc/` — documentação de leitura para integrações;
+- `/api/schema/` — OpenAPI 3.1 consumível por n8n e outras ferramentas.
+
+As páginas são públicas, mas não contêm credenciais. Todos os endpoints
+operacionais continuam exigindo sessão ou `Authorization: Bearer`.
+
 ## Deploy no Coolify
 
 ### Pré-requisitos

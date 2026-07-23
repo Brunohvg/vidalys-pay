@@ -488,3 +488,51 @@ GET /api/v1/payment-links/?cursor=2026-07-21T13:00:00Z&limit=20
 ```
 
 O `next_cursor` na resposta indica o próximo item.
+
+## Documentação publicada
+
+| Rota | Uso |
+|---|---|
+| `GET /api/docs/` | Swagger UI. O envio interativo vem desativado por padrão. |
+| `GET /api/redoc/` | Referência de leitura para parceiros. |
+| `GET /api/schema/` | Contrato OpenAPI 3.1 para ferramentas e geração de clientes. |
+
+Essas três rotas são públicas e limitadas por IP. Elas não retornam chaves,
+segredos, payloads reais ou dados de clientes. A documentação instrui como
+autenticar; as rotas `/api/v1/` mantêm suas próprias permissões e escopos.
+
+## Integração com n8n
+
+Use o node **HTTP Request** com uma credencial do tipo Header Auth:
+
+```text
+Name: Authorization
+Value: Bearer vly_live_SUA_CHAVE
+```
+
+Configuração recomendada para emitir um boleto:
+
+```text
+Method: POST
+URL: https://pay.vidalys.br/api/v1/boletos/
+Send Headers: true
+Idempotency-Key: {{$execution.id}}-{{$itemIndex}}
+Content-Type: application/json
+Send Body: JSON
+```
+
+O body deve incluir `seller_id` quando a autenticação for por API Key. Conceda
+ao cliente apenas `boletos:write`; use também `boletos:read` para consultas e
+`notifications:write` para reenvios. Nunca grave a chave diretamente no
+workflow: mantenha-a em **Credentials** do n8n.
+
+Para importar o contrato em outra ferramenta, use:
+
+```text
+https://pay.vidalys.br/api/schema/
+```
+
+Em criação, cancelamento, reenvio e segunda via, gere uma
+`Idempotency-Key` estável por operação. Em retentativas técnicas, reutilize a
+mesma chave; uma nova ação intencional deve receber uma chave nova. Armazene o
+header `X-Request-ID` retornado para diagnóstico.

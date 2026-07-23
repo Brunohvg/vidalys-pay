@@ -164,3 +164,29 @@ def test_openapi_contract_is_valid_json():
     }
     for path, methods in expected.items():
         assert methods <= set(contract["paths"][path])
+
+
+def test_public_openapi_schema_matches_canonical_contract(client):
+    response = client.get("/api/schema/")
+
+    assert response.status_code == 200
+    assert response.json()["openapi"] == "3.1.0"
+    assert response["Cache-Control"] == "public, max-age=300"
+    assert response["X-Content-Type-Options"] == "nosniff"
+    assert "frame-ancestors 'none'" in response["Content-Security-Policy"]
+
+
+@pytest.mark.parametrize(
+    ("url", "marker"),
+    (
+        ("/api/docs/", "swagger-ui"),
+        ("/api/redoc/", "<redoc"),
+    ),
+)
+def test_public_api_documentation_pages(client, url, marker):
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert marker in response.content.decode()
+    assert "noindex,nofollow" in response.content.decode()
+    assert response["Referrer-Policy"] == "no-referrer"
