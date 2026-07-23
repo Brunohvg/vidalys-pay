@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.admin_panel",
     "apps.sellers",
     "apps.payment_links",
+    "apps.boletos",
     "apps.webhooks",
     "apps.notifications",
     "apps.integrations.pagarme",
