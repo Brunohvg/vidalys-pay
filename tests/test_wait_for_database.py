@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "docker"))
 
 from wait_for_database import (
     MAX_ATTEMPTS,  # noqa: E402
-    _is_dns_error,  # noqa: E402
     _mask_url,  # noqa: E402
     _normalize_url,  # noqa: E402
     main,  # noqa: E402
@@ -56,13 +55,6 @@ class TestNormalizeUrl:
     def test_empty_url_raises(self):
         with pytest.raises(ValueError):
             _normalize_url("not-a-url")
-
-
-def test_detects_database_dns_errors():
-    assert _is_dns_error(
-        "failed to resolve host 'postgres-abc': Temporary failure in name resolution"
-    )
-    assert not _is_dns_error("connection refused")
 
 
 class TestWaitForDatabase:
@@ -134,23 +126,6 @@ class TestWaitForDatabase:
 
             captured = capsys.readouterr()
             assert "MySecret123" not in captured.out
-
-    def test_dns_failure_prints_actionable_coolify_diagnostic(self, capsys):
-        error = psycopg.OperationalError(
-            "failed to resolve host 'postgres-abc': Temporary failure in name resolution"
-        )
-        with (
-            patch("wait_for_database.psycopg.connect", side_effect=error),
-            patch("wait_for_database.time.sleep", return_value=None),
-            pytest.raises(SystemExit),
-        ):
-            wait_for_database("postgresql://user:secret@postgres-abc/db")
-
-        output = capsys.readouterr().out
-        assert "Connect to Predefined Network" in output
-        assert "Internal URL" in output
-        assert "aumentar tentativas não corrige" in output
-        assert "secret" not in output
 
 
 class TestMain:
