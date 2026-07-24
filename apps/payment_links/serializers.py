@@ -16,12 +16,14 @@ class PaymentLinkCreateSerializer(serializers.Serializer):
         max_length=120,
         required=False,
         allow_blank=True,
+        allow_null=True,
         default="",
     )
     customer_phone = serializers.CharField(
         max_length=20,
         required=False,
         allow_blank=True,
+        allow_null=True,
         default="",
     )
     description = serializers.CharField(
@@ -38,7 +40,7 @@ class PaymentLinkCreateSerializer(serializers.Serializer):
         default=None,
     )
 
-    def validate_customer_phone(self, value: str) -> str:
+    def validate_customer_phone(self, value: str | None) -> str:
         """Accept the Brazilian UI mask and persist a canonical E.164 phone."""
         if not value:
             return ""

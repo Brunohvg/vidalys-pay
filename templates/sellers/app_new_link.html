@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.classList.add('loading'); submitBtn.disabled = true;
         var now = new Date();
         var reference = now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-        var payload = {reference: reference, amount_cents: parseInt(amountCents.value, 10), installments: parseInt(installmentsInput.value, 10), customer_name: form.customer_name.value || null, customer_phone: form.customer_phone.value || null};
+        var payload = {reference: reference, amount_cents: parseInt(amountCents.value, 10), installments: parseInt(installmentsInput.value, 10), customer_name: form.customer_name.value.trim(), customer_phone: form.customer_phone.value.trim()};
         try {
             var response = await fetch('/api/v1/payment-links/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrfToken(),'Idempotency-Key':crypto.randomUUID()}, body:JSON.stringify(payload)});
             var data = await response.json();

@@ -109,6 +109,33 @@ def test_create_normalizes_masked_brazilian_phone(client, seller):
 
 
 @pytest.mark.django_db
+def test_create_accepts_null_optional_customer_fields_from_mobile(client, seller):
+    _authenticate(client, seller)
+    provider_response = {"id": "pl_mobile", "url": "https://pay.example/mobile", "status": "active"}
+
+    with patch("apps.payment_links.use_cases.PagarmeClient") as provider:
+        provider.return_value.create_payment_link.return_value = provider_response
+        response = client.post(
+            "/api/v1/payment-links/",
+            {
+                "reference": "API-MOBILE",
+                "amount_cents": 1000,
+                "installments": 1,
+                "customer_name": None,
+                "customer_phone": None,
+            },
+            content_type="application/json",
+            HTTP_IDEMPOTENCY_KEY="mobile-null-fields",
+        )
+
+    assert response.status_code == 201
+    link = PaymentLink.objects.get(reference="API-MOBILE")
+    assert link.customer_name == ""
+    assert link.customer_phone == ""
+    provider.return_value.create_payment_link.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_resend_uses_idempotency_key(client, seller):
     _authenticate(client, seller)
     link = PaymentLink.objects.create(
